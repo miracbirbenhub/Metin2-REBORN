@@ -87,7 +87,7 @@ namespace Metin2Reborn.Editor
             player.name = "Warrior_Player";
             player.tag = "Player";
             player.transform.position = new Vector3(0f, 0.02f, 0f);
-            player.transform.rotation = Quaternion.identity;
+            // The converted Warrior FBX uses a Z-up source orientation; rotate it into Unity Y-up.\n            player.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
 
             if (player.GetComponent<CharacterController>() == null)
             {
