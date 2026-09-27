@@ -85,6 +85,21 @@ namespace Metin2Reborn.Editor
                     warrior.AddComponent<Metin2AutoAttacker>();
 
                 ConfigureWarriorVisuals(warrior);
+                NormalizeWarriorVisual(warrior);
+
+                Renderer[] warriorRenderers = warrior.GetComponentsInChildren<Renderer>(true);
+                int meshFilters = warrior.GetComponentsInChildren<MeshFilter>(true).Length;
+                int skinnedMeshes = warrior.GetComponentsInChildren<SkinnedMeshRenderer>(true).Length;
+                Debug.Log($"Metin2: Warrior diagnostic -> Renderers={warriorRenderers.Length}, MeshFilters={meshFilters}, SkinnedMeshes={skinnedMeshes}");
+
+                if (warriorRenderers.Length == 0)
+                    Debug.LogError("Metin2: Warrior FBX prefab içinde hiç Renderer yok. EXPORT.fbx modeli mesh/skeleton içermiyor veya converter çıktısı hatalı.");
+                else
+                {
+                    Bounds diagnosticBounds = warriorRenderers[0].bounds;
+                    for (int i = 1; i < warriorRenderers.Length; i++) diagnosticBounds.Encapsulate(warriorRenderers[i].bounds);
+                    Debug.Log($"Metin2: Warrior bounds -> Center={diagnosticBounds.center}, Size={diagnosticBounds.size}");
+                }
             }
 
             // Temporary placeholder removed: focus on making the imported Warrior visible first.
@@ -156,6 +171,27 @@ namespace Metin2Reborn.Editor
             }
 
             ApplyWarriorTextures(warrior);
+        }
+
+        private static void NormalizeWarriorVisual(GameObject warrior)
+        {
+            Renderer[] renderers = warrior.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0) return;
+
+            Bounds bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+
+            float height = bounds.size.y;
+            if (height > 0.001f && (height < 0.5f || height > 4f))
+            {
+                float factor = 2f / height;
+                warrior.transform.localScale *= factor;
+                bounds = renderers[0].bounds;
+                for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+            }
+
+            float bottomOffset = bounds.min.y - warrior.transform.position.y;
+            warrior.transform.position -= Vector3.up * bottomOffset;
         }
 
         private static void ApplyWarriorTextures(GameObject warrior)
