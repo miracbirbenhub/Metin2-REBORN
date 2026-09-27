@@ -87,7 +87,10 @@ namespace Metin2Reborn.Editor
             player.name = "Warrior_Player";
             player.tag = "Player";
             player.transform.position = new Vector3(0f, 0.02f, 0f);
-            // The converted Warrior FBX uses a Z-up source orientation; rotate it into Unity Y-up.\n            player.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            // Detect the imported Warrior's up-axis instead of guessing a fixed rotation.
+            // Test the common FBX axis rotations and choose the one that makes the model
+            // tallest on Unity's Y axis.
+            player.transform.rotation = FindBestStandingRotation(player);
 
             if (player.GetComponent<CharacterController>() == null)
             {
@@ -110,6 +113,53 @@ namespace Metin2Reborn.Editor
                 renderer.enabled = true;
 
             return player;
+        }
+
+        private static Quaternion FindBestStandingRotation(GameObject player)
+        {
+            Renderer[] renderers = player.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0)
+                return Quaternion.identity;
+
+            Bounds bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++)
+                bounds.Encapsulate(renderers[i].bounds);
+
+            Vector3 size = bounds.size;
+            Quaternion[] candidates =
+            {
+                Quaternion.identity,
+                Quaternion.Euler(90f, 0f, 0f),
+                Quaternion.Euler(-90f, 0f, 0f),
+                Quaternion.Euler(0f, 0f, 90f),
+                Quaternion.Euler(0f, 0f, -90f),
+                Quaternion.Euler(180f, 0f, 0f),
+                Quaternion.Euler(0f, 180f, 0f)
+            };
+
+            float bestScore = float.MinValue;
+            Quaternion best = Quaternion.identity;
+
+            foreach (Quaternion rotation in candidates)
+            {
+                Vector3 rotated = Abs(rotation * size);
+                float horizontal = Mathf.Max(rotated.x, rotated.z);
+                float score = rotated.y / Mathf.Max(horizontal, 0.001f);
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    best = rotation;
+                }
+            }
+
+            Debug.Log($"Metin2: Warrior auto-orientation -> {best.eulerAngles}, score={bestScore:F2}, sourceBounds={size}");
+            return best;
+        }
+
+        private static Vector3 Abs(Vector3 value)
+        {
+            return new Vector3(Mathf.Abs(value.x), Mathf.Abs(value.y), Mathf.Abs(value.z));
         }
 
         private static GameObject BuildMetinStone()
