@@ -56,6 +56,12 @@ namespace Metin2Reborn.Editor
 
             string prefabPath = Warrior + "/Warrior_Novice.prefab";
             GameObject warriorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (warriorPrefab == null)
+            {
+                RebuildWarriorImport();
+                AssetDatabase.Refresh();
+                warriorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            }
             if (warriorPrefab != null)
             {
                 GameObject warrior = (GameObject)PrefabUtility.InstantiatePrefab(warriorPrefab);
@@ -73,6 +79,8 @@ namespace Metin2Reborn.Editor
                     warrior.AddComponent<Metin2PlayerController>();
                 if (warrior.GetComponent<Metin2AutoAttacker>() == null)
                     warrior.AddComponent<Metin2AutoAttacker>();
+
+                ApplyWarriorTexture(warrior);
             }
 
             GameObject stone = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -96,6 +104,41 @@ namespace Metin2Reborn.Editor
             EditorSceneManager.SaveScene(scene, Scenes + "/WarriorVerticalSlice.unity");
             AssetDatabase.SaveAssets();
             Debug.Log("Metin2: Vertical Slice sahnesi oluşturuldu.");
+        }
+
+        private static void ApplyWarriorTexture(GameObject warrior)
+        {
+            string texturePath = FindAsset("warrior_novice_blue.png");
+            if (string.IsNullOrEmpty(texturePath))
+            {
+                Debug.LogWarning("Metin2: warrior_novice_blue.png bulunamadı; mevcut FBX materyali korunuyor.");
+                return;
+            }
+
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+            if (texture == null) return;
+
+            Material material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            material.name = "Warrior_Novice_Blue_Auto";
+            material.mainTexture = texture;
+            string materialPath = Warrior + "/Warrior_Novice_Blue_Auto.mat";
+            AssetDatabase.CreateAsset(material, materialPath);
+
+            Renderer[] renderers = warrior.GetComponentsInChildren<Renderer>(true);
+            foreach (Renderer renderer in renderers)
+            {
+                Material[] slots = renderer.sharedMaterials;
+                if (slots == null || slots.Length == 0)
+                    renderer.sharedMaterial = material;
+                else
+                {
+                    for (int i = 0; i < slots.Length; i++) slots[i] = material;
+                    renderer.sharedMaterials = slots;
+                }
+            }
+
+            EditorUtility.SetDirty(warrior);
+            AssetDatabase.SaveAssets();
         }
 
         private static string FindAsset(string fileName)
