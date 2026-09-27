@@ -80,7 +80,7 @@ namespace Metin2Reborn.Editor
                 if (warrior.GetComponent<Metin2AutoAttacker>() == null)
                     warrior.AddComponent<Metin2AutoAttacker>();
 
-                ApplyWarriorTexture(warrior);
+                ConfigureWarriorVisuals(warrior);
             }
 
             GameObject stone = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -106,39 +106,85 @@ namespace Metin2Reborn.Editor
             Debug.Log("Metin2: Vertical Slice sahnesi oluşturuldu.");
         }
 
-        private static void ApplyWarriorTexture(GameObject warrior)
+        private static void ConfigureWarriorVisuals(GameObject warrior)
         {
-            string texturePath = FindAsset("warrior_novice_blue.png");
-            if (string.IsNullOrEmpty(texturePath))
+            // Keep the FBX hierarchy intact, but make the imported character behave
+            // like a real third-person player instead of a raw model.
+            warrior.transform.rotation = Quaternion.identity;
+
+            Animator animator = warrior.GetComponent<Animator>();
+            if (animator == null)
+                animator = warrior.AddComponent<Animator>();
+            animator.applyRootMotion = false;
+
+            // CharacterController should wrap the visual model, not replace it.
+            CharacterController cc = warrior.GetComponent<CharacterController>();
+            if (cc != null)
             {
-                Debug.LogWarning("Metin2: warrior_novice_blue.png bulunamadı; mevcut FBX materyali korunuyor.");
-                return;
+                cc.height = 1.8f;
+                cc.radius = 0.32f;
+                cc.center = new Vector3(0f, 0.9f, 0f);
+                cc.skinWidth = 0.04f;
+                cc.stepOffset = 0.3f;
             }
 
-            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
-            if (texture == null) return;
+            ApplyWarriorTextures(warrior);
+        }
 
-            Material material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            material.name = "Warrior_Novice_Blue_Auto";
-            material.mainTexture = texture;
-            string materialPath = Warrior + "/Warrior_Novice_Blue_Auto.mat";
-            AssetDatabase.CreateAsset(material, materialPath);
+        private static void ApplyWarriorTextures(GameObject warrior)
+        {
+            string bluePath = FindAsset("warrior_novice_blue.png");
+            string facePath = FindAsset("warrior_face.png");
+            string hairPath = FindAsset("warrior_novice_hair.png");
+
+            Material blue = CreateOrReplaceMaterial("Warrior_Novice_Blue_Auto", bluePath);
+            Material face = CreateOrReplaceMaterial("Warrior_Face_Auto", facePath);
+            Material hair = CreateOrReplaceMaterial("Warrior_Hair_Auto", hairPath);
 
             Renderer[] renderers = warrior.GetComponentsInChildren<Renderer>(true);
             foreach (Renderer renderer in renderers)
             {
                 Material[] slots = renderer.sharedMaterials;
                 if (slots == null || slots.Length == 0)
-                    renderer.sharedMaterial = material;
-                else
                 {
-                    for (int i = 0; i < slots.Length; i++) slots[i] = material;
-                    renderer.sharedMaterials = slots;
+                    if (blue != null) renderer.sharedMaterial = blue;
+                    continue;
                 }
+
+                for (int i = 0; i < slots.Length; i++)
+                {
+                    string n = renderer.gameObject.name.ToLowerInvariant();
+                    if (n.Contains("hair") && hair != null) slots[i] = hair;
+                    else if ((n.Contains("face") || n.Contains("head")) && face != null) slots[i] = face;
+                    else if (blue != null) slots[i] = blue;
+                }
+                renderer.sharedMaterials = slots;
+                EditorUtility.SetDirty(renderer);
             }
 
-            EditorUtility.SetDirty(warrior);
             AssetDatabase.SaveAssets();
+        }
+
+        private static Material CreateOrReplaceMaterial(string materialName, string texturePath)
+        {
+            if (string.IsNullOrEmpty(texturePath)) return null;
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+            if (texture == null) return null;
+
+            string materialPath = Warrior + "/" + materialName + ".mat";
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+            if (material == null)
+            {
+                material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                material.name = materialName;
+                AssetDatabase.CreateAsset(material, materialPath);
+            }
+
+            material.mainTexture = texture;
+            material.SetFloat("_Smoothness", 0.05f);
+            EditorUtility.SetDirty(material);
+            return material;
+        }
         }
 
         private static string FindAsset(string fileName)
