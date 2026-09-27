@@ -5,6 +5,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
@@ -220,7 +221,7 @@ namespace Metin2Reborn.Editor
         {
             GameObject eventSystem = new GameObject("EventSystem");
             eventSystem.AddComponent<EventSystem>();
-            eventSystem.AddComponent<StandaloneInputModule>();
+            eventSystem.AddComponent<InputSystemUIInputModule>();
 
             GameObject canvasObject = new GameObject("MobileHUD");
             Canvas canvas = canvasObject.AddComponent<Canvas>();
