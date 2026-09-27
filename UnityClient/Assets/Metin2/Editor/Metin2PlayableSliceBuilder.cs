@@ -82,14 +82,26 @@ namespace Metin2Reborn.Editor
             if (prefab == null)
                 throw new System.Exception("Warrior_Novice.prefab bulunamadı.");
 
-            GameObject player = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
-            player.name = "Warrior_Player";
+            // IMPORTANT:
+            // The imported Warrior needs an X/Z visual tilt to stand upright.
+            // Never put that tilt on the CharacterController root, otherwise the
+            // capsule itself becomes horizontal and gravity makes the player fall
+            // through the ground.
+            GameObject visual = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            if (visual == null)
+                throw new System.Exception("Warrior prefab instance oluşturulamadı.");
+
+            visual.name = "Warrior_Visual";
+            visual.transform.rotation = FindBestStandingRotation(visual);
+
+            Metin2AssetPipeline.ConfigureForPlayableInstance(visual);
+
+            GameObject player = new GameObject("Warrior_Player");
             player.tag = "Player";
             player.transform.position = new Vector3(0f, 0.02f, 0f);
-            // Detect the imported Warrior's up-axis instead of guessing a fixed rotation.
-            // Test the common FBX axis rotations and choose the one that makes the model
-            // tallest on Unity's Y axis.
-            player.transform.rotation = FindBestStandingRotation(player);
+            player.transform.rotation = Quaternion.identity;
+
+            visual.transform.SetParent(player.transform, true);
 
             if (player.GetComponent<CharacterController>() == null)
             {
@@ -98,22 +110,15 @@ namespace Metin2Reborn.Editor
                 cc.radius = 0.32f;
                 cc.center = Vector3.up * 0.9f;
                 cc.stepOffset = 0.3f;
+                cc.skinWidth = 0.04f;
             }
 
-            Metin2PlayerController movement = player.GetComponent<Metin2PlayerController>();
-            if (movement == null) movement = player.AddComponent<Metin2PlayerController>();
-
-            if (player.GetComponent<Metin2AutoAttacker>() == null)
-                player.AddComponent<Metin2AutoAttacker>();
-            if (player.GetComponent<Metin2Inventory>() == null)
-                player.AddComponent<Metin2Inventory>();
+            Metin2PlayerController movement = player.AddComponent<Metin2PlayerController>();
+            player.AddComponent<Metin2AutoAttacker>();
+            player.AddComponent<Metin2Inventory>();
 
             foreach (Renderer renderer in player.GetComponentsInChildren<Renderer>(true))
                 renderer.enabled = true;
-
-            // Apply the real Warrior textures to this scene instance.
-            // The imported FBX may still carry white source materials.
-            Metin2AssetPipeline.ConfigureForPlayableInstance(player);
 
             return player;
         }
