@@ -111,6 +111,10 @@ namespace Metin2Reborn.Editor
             foreach (Renderer renderer in player.GetComponentsInChildren<Renderer>(true))
                 renderer.enabled = true;
 
+            // Apply the real Warrior textures to this scene instance.
+            // The imported FBX may still carry white source materials.
+            Metin2AssetPipeline.ConfigureForPlayableInstance(player);
+
             return player;
         }
 
