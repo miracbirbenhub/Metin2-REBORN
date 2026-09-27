@@ -5,6 +5,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$NoesisWorkingDirectory = Split-Path -Parent $NoesisExe
 
 if (-not (Test-Path -LiteralPath $NoesisExe)) {
     Write-Host "Noesis bulunamadı:" -ForegroundColor Red
@@ -61,9 +62,13 @@ foreach ($file in $gr2Files) {
         continue
     }
 
-    $noesisOutput = & $NoesisExe "?cmode" $file.FullName $outFile 2>&1
-    $exitCode = $LASTEXITCODE
-
+    Push-Location $NoesisWorkingDirectory
+    try {
+        $noesisOutput = & $NoesisExe "?cmode" $file.FullName $outFile 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        Pop-Location
+    }
     if ($exitCode -eq 0 -and (Test-Path -LiteralPath $outFile)) {
         $ok++
         $log.Add("OK|$relative|$outFile")
