@@ -1,55 +1,63 @@
 # Metin2-REBORN
 
-A standalone MMORPG project inspired by classic 3D MMORPG systems.
+Mobile-first MMORPG project targeting Android/iOS with a Metin2-compatible visual/gameplay direction.
 
-## Foundation
+## Current foundation
 
-The initial technical reference is the GPL-3.0 licensed Anka2 project. The reference repository contains a Windows C++ client, C++ game/DB server, Lua quest infrastructure and supporting tools.
+The project has switched from the previous Anka2/PC-client direction to a **Unity mobile client** architecture.
 
-## Project goals
+The technical reference for the asset-import side is the open-source **Metin2-to-Unity** tooling ecosystem, including GR2→FBX, map, mesh, material, tree and DDS conversion tools. The published project specifically targets bringing the Metin2 experience to mobile platforms with Unity and reports successful original-map import experiments. We will use only assets we are legally entitled to use; proprietary Metin2 assets are not stored in this repository.
 
-- Real client/server MMORPG architecture
-- Character creation and progression
-- Four initial classes: Warrior, Ninja, Sura, Shaman
-- Movement and combat
-- Monsters and bosses
-- EXP, levels and character stats
-- Equipment and inventory
-- Skills and effects
-- Quests and dungeons
-- Party and guild systems
-- Mounts and pets
-- Shops and trading
-- Original game content and assets
+## Target game loop
+
+1. Create/select character
+2. Receive starter equipment
+3. Enter the first map
+4. Fight mobs and break Metin Stones
+5. Collect Yang and item drops
+6. Upgrade equipment
+7. Increase level and stats
+8. Enter boss content
+9. Obtain stronger equipment/materials
+10. Unlock stronger maps and repeat the progression loop
+
+## Mobile-first goals
+
+- Android first, iOS after the Android vertical slice
+- Touch joystick and action controls
+- Target selection and mobile-friendly combat
+- Camera and UI designed for phones
+- 3D character, monsters, Metin Stones, maps and effects
+- Inventory, equipment and upgrade systems
+- Online client/server architecture
+- Persistent character progression
+- Mobile performance profiling from the beginning
 
 ## Repository layout
 
-- `Client/` - game client integration
-- `Server/` - game and database server
-- `Database/` - schema, seed data and migrations
-- `GameData/` - original game definitions and configuration
-- `Scripts/` - quests and server scripts
-- `Tools/` - build/data utilities
+- `UnityClient/` - Unity mobile client foundation
+- `Server/` - future authoritative game server
+- `Database/` - schema, migrations and seed data
+- `GameData/` - items, mobs, maps, skills, drops and progression definitions
+- `Scripts/` - gameplay/data scripts
+- `Tools/` - import and development utilities
+- `Assets/` - project-owned/licensed assets only
 - `Docs/` - architecture and development notes
-- `Assets/` - original game assets; proprietary third-party assets are not included
+- `Client/` - legacy placeholder from the earlier PC-client experiment
 
-## Development order
+## First playable milestone
 
-1. Bootstrap source tree
-2. Build client
-3. Build server
-4. Connect client <-> server <-> database
-5. Character creation/login
-6. First playable map
-7. Movement/combat
-8. EXP/level/stats
-9. Items/equipment
-10. Skills/effects
-11. Monsters/bosses
-12. Quests/dungeons
-13. Party/guild/trading
-14. Original content and polish
+The first milestone is intentionally small:
 
-## Licensing
+**Warrior -> first map -> camera -> movement -> one Metin Stone -> attack -> destruction -> drop.**
 
-Code imported from third-party projects remains subject to its original license. This repository will preserve required license notices. Game assets must be independently licensed or created for Metin2-REBORN.
+After that works reliably, we add inventory, equipment, upgrade, EXP/level and boss progression.
+
+## Development rules
+
+- Keep the mobile client separate from server authority.
+- Keep gameplay data data-driven where practical.
+- Profile on a real Android device early.
+- Do not commit proprietary game files, credentials or server keys.
+- Preserve the original license of every third-party code/tool component we integrate.
+- Do not put third-party Metin2 assets into this repository unless we have the rights to redistribute them.
