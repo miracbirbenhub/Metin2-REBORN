@@ -43,7 +43,7 @@ namespace Metin2Reborn.Editor
                 string folder = GeneratedPrefabs + "/" + category;
                 EnsureFolderPath(folder);
 
-                string safeName = Sanitize(Path.GetFileNameWithoutExtension(path));
+                string safeName = BuildUniquePrefabName(path);
                 string prefabPath = folder + "/" + safeName + ".prefab";
                 BuildPrefab(model, prefabPath, category);
                 built++;
@@ -178,6 +178,20 @@ namespace Metin2Reborn.Editor
             string ext = Path.GetExtension(path).ToLowerInvariant();
             return ext == ".fbx" || ext == ".obj" || ext == ".dae" ||
                    ext == ".gltf" || ext == ".glb";
+        }
+
+        private static string BuildUniquePrefabName(string assetPath)
+        {
+            string normalized = assetPath.Replace("\\", "/");
+            string relative = normalized.StartsWith(Root + "/", StringComparison.OrdinalIgnoreCase)
+                ? normalized.Substring((Root + "/").Length)
+                : normalized;
+
+            string withoutExtension = Path.ChangeExtension(relative, null).Replace("\\", "/");
+            string[] parts = withoutExtension.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+
+            string combined = string.Join("_", parts);
+            return Sanitize(combined);
         }
 
         private static string Sanitize(string value)
