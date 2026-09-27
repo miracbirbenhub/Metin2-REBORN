@@ -185,7 +185,6 @@ namespace Metin2Reborn.Editor
             EditorUtility.SetDirty(material);
             return material;
         }
-        }
 
         private static string FindAsset(string fileName)
         {
