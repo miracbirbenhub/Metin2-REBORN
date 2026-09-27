@@ -148,6 +148,12 @@ namespace Metin2Reborn.Editor
             Debug.Log("Metin2: Vertical Slice sahnesi oluşturuldu.");
         }
 
+        public static void ConfigureForPlayableInstance(GameObject warrior)
+        {
+            ConfigureWarriorVisuals(warrior);
+            NormalizeWarriorVisual(warrior);
+        }
+
         private static void ConfigureWarriorVisuals(GameObject warrior)
         {
             // The Warrior FBX is already exported in the correct Unity orientation.
@@ -197,11 +203,11 @@ namespace Metin2Reborn.Editor
 
         private static void ApplyWarriorTextures(GameObject warrior)
         {
-            string bluePath = FindAsset("warrior_novice_blue.png");
+            string redPath = FindAsset("warrior_novice_red.png");
             string facePath = FindAsset("warrior_face.png");
             string hairPath = FindAsset("warrior_novice_hair.png");
 
-            Material blue = CreateOrReplaceMaterial("Warrior_Novice_Blue_Auto", bluePath);
+            Material red = CreateOrReplaceMaterial("Warrior_Novice_Red_Auto", redPath);
             Material face = CreateOrReplaceMaterial("Warrior_Face_Auto", facePath);
             Material hair = CreateOrReplaceMaterial("Warrior_Hair_Auto", hairPath);
 
@@ -211,7 +217,7 @@ namespace Metin2Reborn.Editor
                 Material[] slots = renderer.sharedMaterials;
                 if (slots == null || slots.Length == 0)
                 {
-                    if (blue != null) renderer.sharedMaterial = blue;
+                    if (red != null) renderer.sharedMaterial = red;
                     continue;
                 }
 
@@ -220,7 +226,7 @@ namespace Metin2Reborn.Editor
                     string n = renderer.gameObject.name.ToLowerInvariant();
                     if (n.Contains("hair") && hair != null) slots[i] = hair;
                     else if ((n.Contains("face") || n.Contains("head")) && face != null) slots[i] = face;
-                    else if (blue != null) slots[i] = blue;
+                    else if (red != null) slots[i] = red;
                 }
                 renderer.sharedMaterials = slots;
                 EditorUtility.SetDirty(renderer);
