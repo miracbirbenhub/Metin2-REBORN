@@ -289,7 +289,7 @@ namespace Metin2Reborn.Editor
 
         private static void EnsureFolder(string folder)
         {
-            folder = folder.Replace("\", "/");
+            folder = folder.Replace("\\", "/");
             if (AssetDatabase.IsValidFolder(folder)) return;
 
             string[] parts = folder.Split('/');
