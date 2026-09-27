@@ -16,6 +16,8 @@ namespace Metin2Reborn
         private Vector3 velocity;
         private Vector2 moveInput;
         private Vector3 planarVelocity;
+        private float standingTiltX;
+        private float standingTiltZ;
 
         public void SetMoveInput(Vector2 input) => moveInput = Vector2.ClampMagnitude(input, 1f);
         public void SetCamera(Transform value) => cameraTransform = value;
@@ -25,6 +27,12 @@ namespace Metin2Reborn
             controller = GetComponent<CharacterController>();
             if (cameraTransform == null && Camera.main != null)
                 cameraTransform = Camera.main.transform;
+
+            // The imported Warrior needs a fixed X/Z tilt to stand upright.
+            // Movement should change only the Y (yaw) rotation.
+            Vector3 euler = transform.rotation.eulerAngles;
+            standingTiltX = euler.x;
+            standingTiltZ = euler.z;
         }
 
         private void Update()
@@ -44,7 +52,12 @@ namespace Metin2Reborn
 
             if (direction.sqrMagnitude > 0.001f)
             {
-                Quaternion targetRotation = Quaternion.LookRotation(direction);
+                float targetYaw = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
+                Quaternion targetRotation = Quaternion.Euler(
+                    standingTiltX,
+                    targetYaw,
+                    standingTiltZ);
+
                 transform.rotation = Quaternion.Slerp(
                     transform.rotation,
                     targetRotation,
