@@ -92,9 +92,36 @@ namespace Metin2Reborn.Editor
             GameObject cameraObject = new GameObject("Main Camera");
             Camera camera = cameraObject.AddComponent<Camera>();
             cameraObject.tag = "MainCamera";
-            var follow = cameraObject.AddComponent<Metin2FollowCamera>();
-            if (GameObject.Find("Warrior") != null) follow.SetTarget(GameObject.Find("Warrior").transform);
-            cameraObject.transform.position = new Vector3(0f, 4f, -6f);
+
+            GameObject warriorObject = GameObject.Find("Warrior");
+            if (warriorObject != null)
+            {
+                var renderers = warriorObject.GetComponentsInChildren<Renderer>(true);
+                if (renderers.Length > 0)
+                {
+                    Bounds bounds = renderers[0].bounds;
+                    for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+
+                    // Frame the imported model regardless of the FBX export scale.
+                    float size = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
+                    if (size < 0.01f) size = 2f;
+                    float distance = Mathf.Clamp(size * 2.8f, 2.5f, 20f);
+                    Vector3 focus = bounds.center + Vector3.up * (bounds.size.y * 0.05f);
+                    cameraObject.transform.position = focus + new Vector3(0f, size * 0.35f, -distance);
+                    cameraObject.transform.LookAt(focus);
+
+                    camera.nearClipPlane = Mathf.Max(0.01f, size * 0.01f);
+                    camera.farClipPlane = Mathf.Max(100f, size * 20f);
+                }
+
+                var follow = cameraObject.AddComponent<Metin2FollowCamera>();
+                follow.SetTarget(warriorObject.transform);
+            }
+            else
+            {
+                cameraObject.transform.position = new Vector3(0f, 3f, -6f);
+                cameraObject.transform.LookAt(Vector3.up);
+            }
 
             GameObject lightObject = new GameObject("Directional Light");
             var light = lightObject.AddComponent<Light>();
