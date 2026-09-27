@@ -61,7 +61,7 @@ foreach ($file in $gr2Files) {
         continue
     }
 
-    & $NoesisExe "?cmode" $file.FullName $outFile "-fbxnewexport" 2>&1 | Out-Null
+    $noesisOutput = & $NoesisExe "?cmode" $file.FullName $outFile 2>&1
     $exitCode = $LASTEXITCODE
 
     if ($exitCode -eq 0 -and (Test-Path -LiteralPath $outFile)) {
@@ -69,7 +69,9 @@ foreach ($file in $gr2Files) {
         $log.Add("OK|$relative|$outFile")
     } else {
         $failed++
-        $log.Add("FAIL|$relative|exit=$exitCode")
+        $details = (($noesisOutput | ForEach-Object { $_.ToString() }) -join " ").Trim()
+        if ($details.Length -gt 500) { $details = $details.Substring(0,500) }
+        $log.Add("FAIL|$relative|exit=$exitCode|$details")
     }
 }
 
