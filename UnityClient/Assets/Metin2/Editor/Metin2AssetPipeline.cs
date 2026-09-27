@@ -154,6 +154,22 @@ namespace Metin2Reborn.Editor
             // like a real third-person player instead of a raw model.
             warrior.transform.rotation = Quaternion.identity;
 
+            // Some Metin2 GR2->FBX exporters preserve the source's Z-up orientation.
+            // Rotate the imported Warrior into Unity's Y-up world before framing/normalizing.
+            Renderer[] importedRenderers = warrior.GetComponentsInChildren<Renderer>(true);
+            if (importedRenderers.Length > 0)
+            {
+                Bounds importedBounds = importedRenderers[0].bounds;
+                for (int i = 1; i < importedRenderers.Length; i++)
+                    importedBounds.Encapsulate(importedRenderers[i].bounds);
+
+                // A standing humanoid should be much taller on Y than on X/Z.
+                // If Y is clearly the smallest axis, the FBX is lying sideways.
+                float horizontal = Mathf.Max(importedBounds.size.x, importedBounds.size.z);
+                if (importedBounds.size.y < horizontal * 0.65f)
+                    warrior.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);
+            }
+
             Animator animator = warrior.GetComponent<Animator>();
             if (animator == null)
                 animator = warrior.AddComponent<Animator>();
