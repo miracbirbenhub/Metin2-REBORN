@@ -10,6 +10,15 @@ namespace Metin2Reborn
         [SerializeField] private LayerMask targetMask = ~0;
 
         private float cooldown;
+        private float standingTiltX;
+        private float standingTiltZ;
+
+        private void Awake()
+        {
+            Vector3 euler = transform.rotation.eulerAngles;
+            standingTiltX = euler.x;
+            standingTiltZ = euler.z;
+        }
 
         private void Update()
         {
@@ -29,7 +38,18 @@ namespace Metin2Reborn
             }
 
             if (target == null) return;
-            transform.LookAt(new Vector3(target.transform.position.x, transform.position.y, target.transform.position.z));
+            Vector3 flatDirection = target.transform.position - transform.position;
+            flatDirection.y = 0f;
+
+            if (flatDirection.sqrMagnitude > 0.001f)
+            {
+                float targetYaw = Mathf.Atan2(flatDirection.x, flatDirection.z) * Mathf.Rad2Deg;
+                transform.rotation = Quaternion.Euler(
+                    standingTiltX,
+                    targetYaw,
+                    standingTiltZ);
+            }
+
             target.TakeDamage(damage);
             cooldown = 1f / Mathf.Max(0.01f, attacksPerSecond);
         }
