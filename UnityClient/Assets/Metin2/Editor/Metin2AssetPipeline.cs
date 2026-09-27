@@ -67,6 +67,10 @@ namespace Metin2Reborn.Editor
                 GameObject warrior = (GameObject)PrefabUtility.InstantiatePrefab(warriorPrefab);
                 warrior.name = "Warrior";
                 warrior.transform.position = Vector3.zero;
+                warrior.transform.localScale = Vector3.one;
+                // Keep the imported mesh visible even if its source materials are incomplete.
+                foreach (Renderer renderer in warrior.GetComponentsInChildren<Renderer>(true))
+                    renderer.enabled = true;
 
                 if (warrior.GetComponent<CharacterController>() == null)
                 {
@@ -83,11 +87,7 @@ namespace Metin2Reborn.Editor
                 ConfigureWarriorVisuals(warrior);
             }
 
-            GameObject stone = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            stone.name = "MetinStone_Test";
-            stone.transform.position = new Vector3(0f, 1f, 4f);
-            stone.transform.localScale = new Vector3(1.2f, 1f, 1.2f);
-            stone.AddComponent<Metin2Targetable>();
+            // Temporary placeholder removed: focus on making the imported Warrior visible first.
 
             GameObject cameraObject = new GameObject("Main Camera");
             Camera camera = cameraObject.AddComponent<Camera>();
