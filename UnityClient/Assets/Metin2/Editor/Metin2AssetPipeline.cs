@@ -167,7 +167,7 @@ namespace Metin2Reborn.Editor
                 // If Y is clearly the smallest axis, the FBX is lying sideways.
                 float horizontal = Mathf.Max(importedBounds.size.x, importedBounds.size.z);
                 if (importedBounds.size.y < horizontal * 0.65f)
-                    warrior.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);
+                    warrior.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
             }
 
             Animator animator = warrior.GetComponent<Animator>();
