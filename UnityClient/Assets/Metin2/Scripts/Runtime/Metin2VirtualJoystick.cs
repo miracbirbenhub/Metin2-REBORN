@@ -16,6 +16,8 @@ namespace Metin2Reborn
             root = transform as RectTransform;
         }
 
+        public void SetPlayer(Metin2PlayerController value) => player = value;
+
         public void OnPointerDown(PointerEventData eventData) => UpdateInput(eventData);
 
         public void OnDrag(PointerEventData eventData) => UpdateInput(eventData);
