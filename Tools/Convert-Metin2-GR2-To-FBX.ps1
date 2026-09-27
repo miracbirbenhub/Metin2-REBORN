@@ -1,19 +1,10 @@
 param(
     [string]$SourceRoot = "C:\Users\roxy\OneDrive\Masaüstü\Metin2BE-Client-master",
-    [string]$NoesisExe = "C:\Users\roxy\OneDrive\Masaüstü\shared_3d_exporting\noesis\noesis\Noesis.exe",
-    [string]$OutputRoot = ""
+    [string]$OutputRoot = "",
+    [switch]$PrepareBatch
 )
 
 $ErrorActionPreference = "Stop"
-$NoesisWorkingDirectory = Split-Path -Parent $NoesisExe
-
-if (-not (Test-Path -LiteralPath $NoesisExe)) {
-    Write-Host "Noesis bulunamadı:" -ForegroundColor Red
-    Write-Host $NoesisExe
-    Write-Host ""
-    Write-Host "Noesis.exe'nin gerçek yolunu -NoesisExe ile ver."
-    exit 1
-}
 
 if (-not (Test-Path -LiteralPath $SourceRoot)) {
     Write-Host "Kaynak klasör bulunamadı: $SourceRoot" -ForegroundColor Red
@@ -27,66 +18,55 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
 
 $gr2Files = Get-ChildItem -LiteralPath $SourceRoot -Recurse -File -Filter "*.gr2" |
-    Where-Object { $_.FullName -notmatch "\\\.git(\\|$)" -and $_.FullName -notmatch "\\_FBX_EXPORT(\\|$)" }
+    Where-Object {
+        $_.FullName -notmatch "\\.git(\\|$)" -and
+        $_.FullName -notmatch "\\_FBX_EXPORT(\\|$)"
+    }
 
 $total = $gr2Files.Count
-$ok = 0
-$failed = 0
-$index = 0
-$log = New-Object System.Collections.Generic.List[string]
+$commands = New-Object System.Collections.Generic.List[string]
+$manifest = New-Object System.Collections.Generic.List[string]
 
 Write-Host ""
-Write-Host "METIN2 GR2 -> FBX TOPLU DONUSTURUCU" -ForegroundColor Cyan
+Write-Host "METIN2 GR2 -> NOESIS BATCH HAZIRLAYICI" -ForegroundColor Cyan
 Write-Host "Kaynak : $SourceRoot"
 Write-Host "Cikis  : $OutputRoot"
-Write-Host "Noesis : $NoesisExe"
 Write-Host "GR2    : $total"
 Write-Host ""
 
 foreach ($file in $gr2Files) {
-    $index++
-
     $relative = $file.FullName.Substring($SourceRoot.Length).TrimStart('\')
     $relativeDir = Split-Path $relative -Parent
-    $destDir = if ([string]::IsNullOrWhiteSpace($relativeDir)) { $OutputRoot } else { Join-Path $OutputRoot $relativeDir }
+    $destDir = if ([string]::IsNullOrWhiteSpace($relativeDir)) {
+        $OutputRoot
+    } else {
+        Join-Path $OutputRoot $relativeDir
+    }
 
     New-Item -ItemType Directory -Force -Path $destDir | Out-Null
 
     $outFile = Join-Path $destDir ($file.BaseName + ".fbx")
 
-    Write-Progress -Activity "GR2 -> FBX" -Status "$index / $total : $relative" -PercentComplete (($index / [math]::Max($total,1)) * 100)
-
-    if (Test-Path -LiteralPath $outFile) {
-        $ok++
-        $log.Add("SKIP|$relative|already exists")
-        continue
-    }
-
-    Push-Location $NoesisWorkingDirectory
-    try {
-        $noesisOutput = & $NoesisExe "?cmode" $file.FullName $outFile 2>&1
-        $exitCode = $LASTEXITCODE
-    } finally {
-        Pop-Location
-    }
-    if ($exitCode -eq 0 -and (Test-Path -LiteralPath $outFile)) {
-        $ok++
-        $log.Add("OK|$relative|$outFile")
-    } else {
-        $failed++
-        $details = (($noesisOutput | ForEach-Object { $_.ToString() }) -join " ").Trim()
-        if ($details.Length -gt 500) { $details = $details.Substring(0,500) }
-        $log.Add("FAIL|$relative|exit=$exitCode|$details")
-    }
+    # Noesis Batch Process uses: source destination options
+    $commands.Add(('"{0}" "{1}"' -f $file.FullName, $outFile))
+    $manifest.Add(("{0}|{1}" -f $relative, $outFile))
 }
 
-$logPath = Join-Path $OutputRoot "conversion-log.txt"
-$log | Set-Content -Path $logPath -Encoding UTF8
+$commandPath = Join-Path $OutputRoot "Noesis-Batch-Commands.txt"
+$manifestPath = Join-Path $OutputRoot "Noesis-Batch-Manifest.txt"
 
-Write-Progress -Activity "GR2 -> FBX" -Completed
+$commands | Set-Content -Path $commandPath -Encoding UTF8
+$manifest | Set-Content -Path $manifestPath -Encoding UTF8
+
+Write-Host "Hazırlandı." -ForegroundColor Green
+Write-Host "Komut listesi : $commandPath"
+Write-Host "Manifest      : $manifestPath"
 Write-Host ""
-Write-Host "BITTI." -ForegroundColor Green
-Write-Host "Toplam : $total"
-Write-Host "Basari : $ok"
-Write-Host "Hata  : $failed"
-Write-Host "Log   : $logPath"
+Write-Host "NOESIS'TE:"
+Write-Host "1) Tools -> Batch Process"
+Write-Host "2) Recursive kullanacaksan Folder batch ile de oluşturabilirsin."
+Write-Host "3) Commands alanına Noesis-Batch-Commands.txt içeriğini yükle/yapıştır."
+Write-Host "4) Destination yolları _FBX_EXPORT altında hazırlanmıştır."
+Write-Host "5) Export'a bas."
+Write-Host ""
+Write-Host "Noesis GUI batch yöntemi kullanılacağı için ?cmode/CLI çağrısı yapılmıyor." -ForegroundColor Yellow
