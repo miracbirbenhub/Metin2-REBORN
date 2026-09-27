@@ -156,11 +156,9 @@ namespace Metin2Reborn.Editor
 
         private static void ConfigureWarriorVisuals(GameObject warrior)
         {
-            // The Warrior FBX is already exported in the correct Unity orientation.
-            // Do not apply heuristic bounds-based rotations: they can turn a standing
-            // character onto its face when the imported mesh has unusual proportions.
-            warrior.transform.rotation = Quaternion.identity;
-
+            // Keep the rotation selected by the playable scene builder.
+            // The imported GR2/FBX uses a non-standard axis, so forcing identity here
+            // would turn the Warrior back onto the ground.
             Animator animator = warrior.GetComponent<Animator>();
             if (animator == null)
                 animator = warrior.AddComponent<Animator>();
