@@ -5,7 +5,6 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
-using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
@@ -166,7 +165,7 @@ namespace Metin2Reborn.Editor
         {
             GameObject stone = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             stone.name = "Metin_Stone_Test";
-            stone.transform.position = new Vector3(5f, 1.15f, 3f);
+            stone.transform.position = new Vector3(2.8f, 1.15f, 1.2f);
             stone.transform.localScale = new Vector3(1.15f, 1.15f, 1.15f);
 
             Material mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
@@ -176,6 +175,7 @@ namespace Metin2Reborn.Editor
 
             Metin2Targetable target = stone.AddComponent<Metin2Targetable>();
             target.Configure(180, null, 1);
+            AddWorldHealthBar(stone, target);
             return stone;
         }
 
@@ -238,6 +238,7 @@ namespace Metin2Reborn.Editor
 
                 Metin2Targetable target = mob.GetComponent<Metin2Targetable>();
                 target.Configure(120, null, 0);
+                AddWorldHealthBar(mob, target);
 
                 if (mob.GetComponent<Collider>() == null)
                 {
@@ -249,6 +250,45 @@ namespace Metin2Reborn.Editor
 
                 break;
             }
+        }
+
+        private static void AddWorldHealthBar(GameObject owner, Metin2Targetable target)
+        {
+            GameObject canvasObject = new GameObject("HealthBar");
+            canvasObject.transform.SetParent(owner.transform, false);
+            Canvas canvas = canvasObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            canvasObject.AddComponent<CanvasScaler>();
+            canvasObject.AddComponent<GraphicRaycaster>();
+            RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
+            canvasRect.sizeDelta = new Vector2(1.6f, 0.22f);
+            canvasRect.localScale = Vector3.one * 0.01f;
+            canvasRect.localPosition = new Vector3(0f, 1.65f, 0f);
+
+            GameObject bgObject = new GameObject("Background", typeof(RectTransform));
+            bgObject.transform.SetParent(canvasObject.transform, false);
+            RectTransform bgRect = bgObject.GetComponent<RectTransform>();
+            bgRect.anchorMin = Vector2.zero;
+            bgRect.anchorMax = Vector2.one;
+            bgRect.offsetMin = Vector2.zero;
+            bgRect.offsetMax = Vector2.zero;
+            Image bg = bgObject.AddComponent<Image>();
+            bg.color = new Color(0f, 0f, 0f, 0.75f);
+
+            GameObject fillObject = new GameObject("Fill", typeof(RectTransform));
+            fillObject.transform.SetParent(canvasObject.transform, false);
+            RectTransform fillRect = fillObject.GetComponent<RectTransform>();
+            fillRect.anchorMin = Vector2.zero;
+            fillRect.anchorMax = Vector2.one;
+            fillRect.offsetMin = new Vector2(0.02f, 0.02f);
+            fillRect.offsetMax = new Vector2(-0.02f, -0.02f);
+            Image fill = fillObject.AddComponent<Image>();
+            fill.type = Image.Type.Filled;
+            fill.fillMethod = Image.FillMethod.Horizontal;
+            fill.fillOrigin = 0;
+
+            Metin2HealthBar healthBar = canvasObject.AddComponent<Metin2HealthBar>();
+            healthBar.Initialize(target);
         }
 
         private static void BuildCamera(GameObject player)
