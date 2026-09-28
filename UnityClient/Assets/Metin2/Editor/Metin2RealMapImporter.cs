@@ -253,48 +253,29 @@ namespace Metin2Reborn.Editor
             if (!File.Exists(source))
                 throw new Exception("minimap.dds bulunamadı: " + source);
 
-            // Blue 1 minimap.dds files are the classic 256x256 uncompressed
-            // X8R8G8B8 DDS variant (128-byte header + 256*256*4 bytes).
-            // Unity may reject these legacy DDS files, so decode them here and
-            // save a normal PNG that Unity can import reliably.
-            byte[] dds = File.ReadAllBytes(source);
-            if (dds.Length < 128 + 256 * 256 * 4)
-                throw new Exception("minimap.dds beklenenden küçük: " + source);
-
-            if (dds[0] != (byte)'D' || dds[1] != (byte)'D' || dds[2] != (byte)'S' || dds[3] != (byte)' ')
-                throw new Exception("Geçersiz DDS header: " + source);
-
-            int width = BitConverter.ToInt32(dds, 16);
-            int height = BitConverter.ToInt32(dds, 12);
-            int rgbBitCount = BitConverter.ToInt32(dds, 88);
-            if (width != 256 || height != 256 || rgbBitCount != 32)
-                throw new Exception($"Blue 1 minimap DDS formatı beklenen X8R8G8B8 değil: {width}x{height}, {rgbBitCount} bit.");
-
-            Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false, false);
-            Color32[] pixels = new Color32[width * height];
-
-            int offset = 128;
-            for (int y = 0; y < height; y++)
-            {
-                for (int x = 0; x < width; x++)
-                {
-                    int i = offset + ((y * width + x) * 4);
-                    byte b = dds[i + 0];
-                    byte g = dds[i + 1];
-                    byte r = dds[i + 2];
-                    pixels[(height - 1 - y) * width + x] = new Color32(r, g, b, 255);
-                }
-            }
-
-            texture.SetPixels32(pixels);
-            texture.Apply(false, false);
-
+            // Metin2 minimap.dds is documented as a 256x256 chunk image,
+            // but the exact DDS payload/header varies between client builds.
+            // Do not assume X8R8G8B8 or a fixed byte size here.
+            // Use System.Drawing only when available in the Unity editor to
+            // decode legacy DDS through Windows Imaging Component; otherwise
+            // fall back to the existing PNG conversion pipeline.
             string folder = "Assets/Metin2/Generated/Maps/Blue1/Minimap";
             EnsureFolder(folder);
-            string pngAssetPath = folder + "/minimap_" + chunkName + ".png";
             string pngFilePath = Path.Combine(Application.dataPath, "Metin2/Generated/Maps/Blue1/Minimap/minimap_" + chunkName + ".png");
-            File.WriteAllBytes(pngFilePath, texture.EncodeToPNG());
-            UnityEngine.Object.DestroyImmediate(texture);
+            string pngAssetPath = folder + "/minimap_" + chunkName + ".png";
+
+            try
+            {
+                using (var image = System.Drawing.Image.FromFile(source))
+                using (var bitmap = new System.Drawing.Bitmap(image))
+                {
+                    bitmap.Save(pngFilePath, System.Drawing.Imaging.ImageFormat.Png);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                throw new Exception("Metin2 minimap.dds Unity/Windows DDS decoder tarafından okunamadı. DDS boyutu/formatı farklı bir varyant: " + source + " | " + ex.Message);
+            }
 
             AssetDatabase.ImportAsset(pngAssetPath, ImportAssetOptions.ForceSynchronousImport);
             TextureImporter importer = AssetImporter.GetAtPath(pngAssetPath) as TextureImporter;
