@@ -172,13 +172,10 @@ namespace Metin2Reborn.Editor
             if (usedValues.Count == 0)
                 throw new Exception("tile.raw içinde geçerli Blue 1 texture index bulunamadı: " + tilePath);
 
-            // Unity/URP terrain uses a limited number of layers per terrain
-            // pass. Blue 1 sectors normally stay below this limit.
-            if (usedValues.Count > 8)
-                throw new Exception("Blue 1 chunk 8'den fazla terrain texture kullanıyor: " +
-                                    Path.GetFileName(Path.GetDirectoryName(tilePath)) +
-                                    " -> " + string.Join(",", usedValues));
-
+            // URP can render more than four Terrain Layers by using additional
+            // passes. Eight is an HDRP single-pass limit, not a hard URP limit.
+            // Blue 1 chunk 001002 legitimately uses 9 textures, so keep all
+            // source textures instead of aborting the entire map import.
             TerrainLayer[] layers = new TerrainLayer[usedValues.Count];
             for (int i = 0; i < usedValues.Count; i++)
             {
