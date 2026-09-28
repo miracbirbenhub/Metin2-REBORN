@@ -12,6 +12,7 @@ namespace Metin2Reborn.Editor
         private const string TextureRoot = "Assets/Metin2/Imported/Blue1Required/Textures";
         private const string PrefabRoot = "Assets/Metin2/Generated/Prefabs";
         private const string MaterialRoot = "Assets/Metin2/Generated/Materials/Blue1";
+        private const string SourceClientRoot = "C:/Users/roxy/OneDrive/Masaüstü/Metin2BE-Client-master";
 
         [MenuItem("Metin2/Blue 1/Link Building Textures")]
         public static void Link()
@@ -61,6 +62,8 @@ namespace Metin2Reborn.Editor
                         }
 
                         Texture2D tex = FindTexture(textures, source.name, renderer.name, prefab.name, AssetDatabase.GetAssetPath(source));
+                        if (tex == null)
+                            tex = FindNearbySourceTexture(textures, prefab.name, source.name, renderer.name);
                         if (tex != null)
                         {
                             SetTexture(existing, tex);
@@ -87,6 +90,60 @@ namespace Metin2Reborn.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log($"Metin2 Blue 1 texture link: {prefabCount} prefab, {rendererCount} renderer, {materialCount} material, {linked} texture baglantisi.");
+        }
+
+        private static Texture2D FindNearbySourceTexture(Dictionary<string, Texture2D> textures, string prefabName, string materialName, string rendererName)
+        {
+            if (!Directory.Exists(SourceClientRoot)) return null;
+
+            string targetKey = Normalize(prefabName);
+            string materialKey = Normalize(materialName);
+            string rendererKey = Normalize(rendererName);
+
+            foreach (string gr2 in Directory.GetFiles(SourceClientRoot, "*.gr2", SearchOption.AllDirectories))
+            {
+                if (!string.Equals(Normalize(Path.GetFileNameWithoutExtension(gr2)), targetKey, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string dir = Path.GetDirectoryName(gr2);
+                if (string.IsNullOrEmpty(dir)) return null;
+
+                string[] nearby = Directory.GetFiles(dir, "*.dds", SearchOption.AllDirectories);
+                Texture2D fallback = null;
+
+                foreach (string dds in nearby)
+                {
+                    string key = Normalize(Path.GetFileNameWithoutExtension(dds));
+                    if (string.IsNullOrEmpty(key)) continue;
+
+                    if (!string.IsNullOrEmpty(materialKey) &&
+                        (key.Contains(materialKey) || materialKey.Contains(key)))
+                    {
+                        string unityPath = FindUnityTexturePath(textures, key);
+                        if (unityPath != null) return textures[key];
+                    }
+
+                    if (!string.IsNullOrEmpty(rendererKey) &&
+                        (key.Contains(rendererKey) || rendererKey.Contains(key)))
+                    {
+                        string unityPath = FindUnityTexturePath(textures, key);
+                        if (unityPath != null) return textures[key];
+                    }
+
+                    string unityKey = key;
+                    if (textures.TryGetValue(unityKey, out var candidate))
+                        fallback = candidate;
+                }
+
+                return fallback;
+            }
+
+            return null;
+        }
+
+        private static string FindUnityTexturePath(Dictionary<string, Texture2D> textures, string key)
+        {
+            return textures.ContainsKey(key) ? key : null;
         }
 
         private static Texture2D FindTexture(Dictionary<string, Texture2D> textures, params string[] names)
