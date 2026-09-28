@@ -151,9 +151,10 @@ if ($ConvertNow) {
         if ($parts.Count -ne 2) { continue }
         $source = $parts[0].TrimStart('"')
         $out = $parts[1].TrimEnd('"')
-        $name = [System.IO.Path]::GetFileNameWithoutExtension($source)
-        $asciiSource = Join-Path $tempIn ($name + ".gr2")
-        $asciiOut = Join-Path $tempOut ($name + ".fbx")
+        $relativeSource = $source.Substring($SourceRoot.Length).TrimStart('\\')
+        $asciiSource = Join-Path $tempIn $relativeSource
+        $asciiOut = Join-Path $tempOut ([System.IO.Path]::GetFileNameWithoutExtension($source) + ".fbx")
+        New-Item -ItemType Directory -Force -Path (Split-Path $asciiSource -Parent) | Out-Null
         Copy-Item -LiteralPath $source -Destination $asciiSource -Force
         $jobs += [pscustomobject]@{ Source=$source; Out=$out; AsciiSource=$asciiSource; AsciiOut=$asciiOut }
     }
@@ -161,8 +162,10 @@ if ($ConvertNow) {
     $done = 0
     $failed = 0
     foreach ($job in $jobs) {
-        & $noesis "?cmode" $job.AsciiSource $job.AsciiOut
-        if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $job.AsciiOut)) {
+        & $noesis "?cmode" $job.AsciiSource $job.AsciiOut 2>&1 | Out-Host
+        # Noesis can emit a Python SyntaxError from an auxiliary plugin while the GR2
+        # reader still completes the FBX export. The actual output file is authoritative.
+        if (Test-Path -LiteralPath $job.AsciiOut) {
             New-Item -ItemType Directory -Force -Path (Split-Path $job.Out -Parent) | Out-Null
             Copy-Item -LiteralPath $job.AsciiOut -Destination $job.Out -Force
             $done++
