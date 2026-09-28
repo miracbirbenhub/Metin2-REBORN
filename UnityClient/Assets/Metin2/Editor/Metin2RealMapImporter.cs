@@ -154,34 +154,48 @@ namespace Metin2Reborn.Editor
             if (bytes.Length != TileRawResolution * TileRawResolution)
                 throw new Exception("tile.raw beklenmeyen boyutta: " + bytes.Length);
 
-            // tile.raw stores the actual TextureSet index (1..17). Do NOT use
-            // a hard-coded global list: different Blue 1 chunks can use
-            // different subsets of the 17 textures. Unknown values were
-            // previously forced to slot 0, which turned large parts of the
-            // map into the brown field texture.
-            List<int> usedValues = new List<int>();
-            for (int i = 0; i < bytes.Length; i++)
+            // Blue 1 tile.raw is a 258x258 byte splat map. The inner 256x256
+            // cells correspond to the terrain alphamap. Values 1..17 select
+            // the textures from metin2_C1.txt in the same order as our
+            // generated Blue1_00..16 TerrainLayers.
+            int[] frequency = new int[TerrainTextureCount];
+            for (int y = 0; y < SplatResolution; y++)
             {
-                int value = bytes[i];
-                if (value < 1 || value > TerrainTextureCount) continue;
-                if (!usedValues.Contains(value))
-                    usedValues.Add(value);
+                int sourceY = y + 1;
+                for (int x = 0; x < SplatResolution; x++)
+                {
+                    int raw = bytes[sourceY * TileRawResolution + (x + 1)];
+                    if (raw >= 1 && raw <= TerrainTextureCount)
+                        frequency[raw - 1]++;
+                }
+            }
+
+            // Unity/URP terrain shaders have a practical layer limit. Keep the
+            // eight most-used source textures per chunk instead of letting an
+            // unsupported ninth+ layer collapse the whole terrain to layer 0.
+            List<int> usedValues = new List<int>();
+            for (int n = 0; n < TerrainTextureCount; n++)
+            {
+                int best = -1;
+                for (int i = 0; i < TerrainTextureCount; i++)
+                {
+                    if (frequency[i] <= 0 || usedValues.Contains(i + 1)) continue;
+                    if (best < 0 || frequency[i] > frequency[best])
+                        best = i;
+                }
+                if (best < 0 || usedValues.Count >= 8) break;
+                usedValues.Add(best + 1);
             }
             usedValues.Sort();
 
             if (usedValues.Count == 0)
                 throw new Exception("tile.raw içinde geçerli Blue 1 texture index bulunamadı: " + tilePath);
 
-            // URP can render more than four Terrain Layers by using additional
-            // passes. Eight is an HDRP single-pass limit, not a hard URP limit.
-            // Blue 1 chunk 001002 legitimately uses 9 textures, so keep all
-            // source textures instead of aborting the entire map import.
             TerrainLayer[] layers = new TerrainLayer[usedValues.Count];
             for (int i = 0; i < usedValues.Count; i++)
             {
-                int sourceValue = usedValues[i];
                 string path = DataRoot + "/TerrainLayers/Blue1_" +
-                              (sourceValue - 1).ToString("D2") + ".terrainlayer";
+                              (usedValues[i] - 1).ToString("D2") + ".terrainlayer";
                 layers[i] = AssetDatabase.LoadAssetAtPath<TerrainLayer>(path);
                 if (layers[i] == null)
                     throw new Exception("Blue 1 TerrainLayer bulunamadı: " + path);
@@ -192,34 +206,28 @@ namespace Metin2Reborn.Editor
 
             for (int y = 0; y < SplatResolution; y++)
             {
-                // tile.raw has a one-cell border around its 256x256 payload.
-                // Keep the same orientation used by the source map.
-                int sourceY = TileRawResolution - 2 - y;
-
+                int sourceY = y + 1;
                 for (int x = 0; x < SplatResolution; x++)
                 {
-                    int sourceX = x + 1;
-                    int raw = bytes[sourceY * TileRawResolution + sourceX];
-
+                    int raw = bytes[sourceY * TileRawResolution + (x + 1)];
                     int slot = usedValues.IndexOf(raw);
 
-                    // Border/unused values can exist in tile.raw. Find the
-                    // nearest valid texture index instead of blindly using
-                    // grass/brown slot 0.
                     if (slot < 0)
                     {
-                        int nearest = usedValues[0];
-                        int distance = Mathf.Abs(raw - nearest);
-                        for (int i = 1; i < usedValues.Count; i++)
+                        // Invalid border values: use the nearest selected source
+                        // texture rather than painting the entire cell with layer 0.
+                        int nearest = 0;
+                        int distance = int.MaxValue;
+                        for (int i = 0; i < usedValues.Count; i++)
                         {
                             int d = Mathf.Abs(raw - usedValues[i]);
                             if (d < distance)
                             {
                                 distance = d;
-                                nearest = usedValues[i];
+                                nearest = i;
                             }
                         }
-                        slot = usedValues.IndexOf(nearest);
+                        slot = nearest;
                     }
 
                     alpha[y, x, slot] = 1f;
@@ -227,6 +235,8 @@ namespace Metin2Reborn.Editor
             }
 
             data.SetAlphamaps(0, 0, alpha);
+            Debug.Log("Metin2: " + Path.GetFileName(tilePath) +
+                      " terrain textures = " + string.Join(",", usedValues));
         }
 
         private static void BuildLighting()
@@ -462,34 +472,10 @@ namespace Metin2Reborn.Editor
 
             data.SetHeights(0, 0, heights);
 
-            // IMPORTANT: tile.raw is loaded by the original client through
-            // CTerrain::LoadSplatFile, but its byte-to-texture interpretation is
-            // not documented reliably. Directly treating its bytes as TextureSet
-            // IDs produced large brown regions. Keep the proven 256x256 minimap
-            // as the terrain diffuse until the splat format is decoded exactly.
-            // The real height.raw remains active, so this is still fully walkable
-            // terrain rather than a flat minimap.
-            Texture2D minimap = ImportBlue1MinimapTexture(chunkName, chunkPath);
-            TerrainLayer minimapLayer = new TerrainLayer
-            {
-                diffuseTexture = minimap,
-                tileSize = new Vector2(chunkSize, chunkSize),
-                tileOffset = Vector2.zero
-            };
-            string layerAssetPath = DataRoot + "/TerrainLayers/Blue1_Minimap_" + chunkName + ".terrainlayer";
-            TerrainLayer existingLayer = AssetDatabase.LoadAssetAtPath<TerrainLayer>(layerAssetPath);
-            if (existingLayer == null)
-            {
-                AssetDatabase.CreateAsset(minimapLayer, layerAssetPath);
-            }
-            else
-            {
-                existingLayer.diffuseTexture = minimap;
-                existingLayer.tileSize = new Vector2(chunkSize, chunkSize);
-                EditorUtility.SetDirty(existingLayer);
-                minimapLayer = existingLayer;
-            }
-            data.terrainLayers = new[] { minimapLayer };
+            // Use the real Blue 1 tile.raw splat map for the ground. The
+            // minimap remains available as a diagnostic asset but is not used
+            // as the 3D terrain diffuse.
+            ApplyBlue1TextureSplat(data, Path.Combine(chunkPath, "tile.raw"));
 
             string assetPath = DataRoot + "/Terrain_" + chunkName + ".asset";
             AssetDatabase.CreateAsset(data, assetPath);
