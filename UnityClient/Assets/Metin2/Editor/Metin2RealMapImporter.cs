@@ -575,7 +575,7 @@ namespace Metin2Reborn.Editor
             // positive spawn height places the player above the ground.
             float totalWidth = ChunkColumns * 128f * CellScale * WorldScale;
             float totalDepth = ChunkRows * 128f * CellScale * WorldScale;
-            player.transform.localPosition = new Vector3(totalWidth * 0.5f, 8f, totalDepth * 0.5f);
+            player.transform.localPosition = new Vector3(totalWidth * 0.5f, 150f, totalDepth * 0.5f);
             player.transform.rotation = Quaternion.identity;
 
             visual.transform.SetParent(player.transform, true);
