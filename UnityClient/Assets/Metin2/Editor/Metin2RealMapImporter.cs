@@ -147,21 +147,23 @@ namespace Metin2Reborn.Editor
             if (bytes.Length != TileRawResolution * TileRawResolution)
                 throw new Exception("tile.raw beklenmeyen boyutta: " + bytes.Length);
 
-            TerrainLayer[] layers = new TerrainLayer[TerrainTextureCount];
-            for (int i = 0; i < TerrainTextureCount; i++)
+            // URP Terrain Lit supports up to 8 terrain layers. Blue 1's
+            // tile.raw currently uses only raw values 1,4,5,6,8,11, so we
+            // keep exactly those six source textures and remap them to slots 0-5.
+            int[] sourceValues = { 1, 4, 5, 6, 8, 11 };
+            TerrainLayer[] layers = new TerrainLayer[sourceValues.Length];
+            for (int i = 0; i < sourceValues.Length; i++)
             {
-                string path = DataRoot + "/TerrainLayers/Blue1_" + i.ToString("D2") + ".terrainlayer";
+                string path = DataRoot + "/TerrainLayers/Blue1_" +
+                              (sourceValues[i] - 1).ToString("D2") + ".terrainlayer";
                 layers[i] = AssetDatabase.LoadAssetAtPath<TerrainLayer>(path);
+                if (layers[i] == null)
+                    throw new Exception("Blue 1 TerrainLayer bulunamadı: " + path);
             }
             data.terrainLayers = layers;
 
-            float[,,] alpha = new float[SplatResolution, SplatResolution, TerrainTextureCount];
+            float[,,] alpha = new float[SplatResolution, SplatResolution, sourceValues.Length];
 
-            // Metin2 tile.raw is a 258x258 byte texture-index map. The
-            // playable terrain area is the inner 256x256 region. The original
-            // client reads the rows from bottom to top and stores each byte as
-            // textureIndex = rawByte - 1. Preserve that mapping at full
-            // resolution instead of collapsing 2x2 cells into one material.
             for (int y = 0; y < SplatResolution; y++)
             {
                 int sourceY = TileRawResolution - 2 - y;
@@ -171,10 +173,10 @@ namespace Metin2Reborn.Editor
                     int sourceX = x + 1;
                     byte raw = bytes[sourceY * TileRawResolution + sourceX];
 
-                    int textureIndex = raw - 1;
-                    textureIndex = Mathf.Clamp(textureIndex, 0, TerrainTextureCount - 1);
+                    int slot = Array.IndexOf(sourceValues, (int)raw);
+                    if (slot < 0) slot = 0;
 
-                    alpha[y, x, textureIndex] = 1f;
+                    alpha[y, x, slot] = 1f;
                 }
             }
 
@@ -312,11 +314,17 @@ namespace Metin2Reborn.Editor
             // Blue 1 uses the URP Terrain Lit shader. Do not tint the
             // terrain with a generic material color: that was masking the
             // imported splat textures and made the whole map brown.
-            // Let the active render pipeline use its native Terrain material.
-            // Do not assign a custom material here; Terrain Layers are rendered
-            // from TerrainData's splat weights by the pipeline's terrain shader.
-            terrain.materialType = Terrain.MaterialType.BuiltInStandard;
-            terrain.materialTemplate = null;
+            // This project uses URP. URP Terrain Lit is required for
+            // Terrain Layers; BuiltInStandard uses the built-in pipeline shader
+            // and can make the terrain disappear in a URP project.
+            Shader terrainShader = Shader.Find("Universal Render Pipeline/Terrain/Lit");
+            if (terrainShader == null)
+                throw new Exception("URP Terrain/Lit shader bulunamadı.");
+
+            Material material = new Material(terrainShader);
+            material.name = "Blue1_Terrain_" + chunkName + "_Material";
+            terrain.materialType = Terrain.MaterialType.Custom;
+            terrain.materialTemplate = material;
         }
 
         private static GameObject BuildPlayer(Transform mapRoot)
