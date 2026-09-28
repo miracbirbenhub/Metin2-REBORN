@@ -518,7 +518,12 @@ namespace Metin2Reborn.Editor
                         }
 
                         string key = NormalizeModelKey(property.ModelName);
-                        if (!prefabs.TryGetValue(key, out GameObject prefab))
+                        GameObject prefab;
+                        if (!prefabs.TryGetValue(key, out prefab))
+                        {
+                            prefab = FindPrefabByModelSuffix(prefabs, key);
+                        }
+                        if (prefab == null)
                         {
                             unresolvedPrefab++;
                             continue;
@@ -603,6 +608,16 @@ namespace Metin2Reborn.Editor
             }
             Debug.Log("Metin2: Source object prefab indexi: " + result.Count);
             return result;
+        }
+
+        private static GameObject FindPrefabByModelSuffix(Dictionary<string, GameObject> prefabs, string key)
+        {
+            foreach (KeyValuePair<string, GameObject> pair in prefabs)
+            {
+                if (pair.Key.EndsWith("_" + key, StringComparison.OrdinalIgnoreCase))
+                    return pair.Value;
+            }
+            return null;
         }
 
         private static List<SourceMapObject> ReadAreaData(string path)
