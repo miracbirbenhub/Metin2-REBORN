@@ -314,11 +314,11 @@ namespace Metin2Reborn.Editor
             AssetDatabase.CreateAsset(texture, assetPath);
             AssetDatabase.SaveAssets();
 
-            Texture2D imported = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
-            if (imported == null)
-                throw new Exception("Blue 1 minimap Texture2D asset oluşturulamadı: " + assetPath);
-
-            return imported;
+            // CreateAsset serializes the object and keeps the original Texture2D
+            // reference valid. Do not immediately round-trip through
+            // LoadAssetAtPath here; Unity can defer visibility of the new asset
+            // until the current AssetDatabase operation finishes.
+            return texture;
         }
 
         private static Color32[] DecodeDxt1Palette(ushort c0, ushort c1)
