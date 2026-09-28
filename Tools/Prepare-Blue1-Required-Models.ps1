@@ -2,7 +2,7 @@ param(
     [string]$SourceRoot = "",
     [string]$MapRoot = "",
     [string]$ExportRoot = "",
-    [switch]$CopyOnly
+    [switch]$CopyOnly,`n    [switch]$ConvertNow
 )
 
 $ErrorActionPreference = "Stop"
@@ -126,6 +126,28 @@ foreach ($model in ($requiredModels | Sort-Object)) {
 
 $commandLines | Set-Content -LiteralPath $commandsPath -Encoding UTF8
 $manifestLines | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+
+if ($ConvertNow) {
+    $desktop = [Environment]::GetFolderPath("Desktop")
+    $noesis = Join-Path $desktop "shared_3d_exporting\noesis\noesis\Noesis.exe"
+    if (-not (Test-Path -LiteralPath $noesis)) { throw "Noesis.exe bulunamadi: $noesis" }
+    Write-Host ""
+    Write-Host "NOESIS: $noesis" -ForegroundColor Cyan
+    Write-Host "Gerekli GR2 modeller FBX'e cevriliyor..." -ForegroundColor Yellow
+    $done = 0
+    $failed = 0
+    foreach ($line in $commandLines) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        $parts = $line -split '" "'
+        if ($parts.Count -ne 2) { $failed++; continue }
+        $source = $parts[0].TrimStart('"')
+        $out = $parts[1].TrimEnd('"')
+        & $noesis "?cmode" $source $out
+        if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $out)) { $done++ } else { $failed++; Write-Warning "Noesis donusum hatasi: $source" }
+    }
+    Write-Host "FBX basarili : $done" -ForegroundColor Green
+    Write-Host "FBX hatali   : $failed" -ForegroundColor Red
+}
 
 Write-Host "AreaData property ID : $($usedIds.Count)"
 Write-Host "Building model       : $($requiredModels.Count)"
