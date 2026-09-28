@@ -47,8 +47,6 @@ namespace Metin2Reborn.Editor
                 Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
                 BuildLighting();
                 ImportBlue1Textures();
-                AssetDatabase.Refresh();
-                CreateBlue1TerrainLayers();
 
                 float chunkSize = 128f * CellScale * WorldScale;
                 float totalWidth = ChunkColumns * chunkSize;
@@ -78,6 +76,7 @@ namespace Metin2Reborn.Editor
                 EditorSceneManager.SaveScene(scene, ScenePath);
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
+                CreateBlue1TerrainLayers();
 
                 // Open the generated scene immediately so the imported map is visible.
                 EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
@@ -133,6 +132,7 @@ namespace Metin2Reborn.Editor
             }
 
             AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
             Debug.Log("Metin2: Blue 1 için 17 TerrainLayer oluşturuldu.");
         }
 
