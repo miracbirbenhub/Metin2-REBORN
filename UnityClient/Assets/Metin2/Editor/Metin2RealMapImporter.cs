@@ -21,7 +21,6 @@ namespace Metin2Reborn.Editor
         private const int SourceHeightResolution = 131;
         private const int UnityHeightResolution = 129;
 
-        // Metin2 CellScale is 200 source units. 0.01 converts roughly to Unity meters.
         private const float WorldScale = 0.01f;
         private const float CellScale = 200f;
         private const float HeightScale = 0.5f;
@@ -65,7 +64,7 @@ namespace Metin2Reborn.Editor
                     }
                 }
 
-                GameObject player = BuildPlayer(mapRoot.transform, chunkSize);
+                GameObject player = BuildPlayer(mapRoot.transform);
                 BuildCamera(player);
                 BuildFallbackEnvironment();
 
@@ -73,7 +72,10 @@ namespace Metin2Reborn.Editor
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
 
-                Selection.activeGameObject = mapRoot;
+                // Open the generated scene immediately so the imported map is visible.
+                EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+                Selection.activeGameObject = GameObject.Find("METIN2_BLUE_1_REAL_MAP");
+
                 Debug.Log("Metin2: REAL BLUE 1 import tamamlandı. 20 terrain chunk oluşturuldu.");
                 Debug.Log("Metin2: Terrain heightmap = 129x129, kaynak height.raw = 131x131.");
                 Debug.Log("Metin2: WorldScale=" + WorldScale + ", ChunkSize=" + chunkSize);
@@ -129,16 +131,17 @@ namespace Metin2Reborn.Editor
             TerrainData data = new TerrainData
             {
                 heightmapResolution = UnityHeightResolution,
-                size = new Vector3(chunkSize, Mathf.Max(1f, (max - min) * HeightScale * WorldScale), chunkSize),
+                size = new Vector3(
+                    chunkSize,
+                    Mathf.Max(1f, (max - min) * HeightScale * WorldScale),
+                    chunkSize),
                 baseMapResolution = 128,
                 alphamapResolution = 128
             };
 
             float[,] heights = new float[UnityHeightResolution, UnityHeightResolution];
-
-            // Metin2 supplies 131x131 samples while Unity terrain accepts 129.
-            // Drop the outermost sample on each side and normalize per chunk.
             float range = Mathf.Max(1f, max - min);
+
             for (int y = 0; y < UnityHeightResolution; y++)
             {
                 for (int x = 0; x < UnityHeightResolution; x++)
@@ -157,10 +160,11 @@ namespace Metin2Reborn.Editor
             terrainObject.name = "Terrain_" + chunkName;
             terrainObject.transform.SetParent(parent, false);
 
-            float yOffset = min * HeightScale * WorldScale;
+            // Keep the imported map at a playable local elevation. The source
+            // absolute height values are not needed for the Unity world origin.
             terrainObject.transform.localPosition = new Vector3(
                 col * chunkSize,
-                yOffset,
+                0f,
                 row * chunkSize);
 
             Terrain terrain = terrainObject.GetComponent<Terrain>();
@@ -168,17 +172,13 @@ namespace Metin2Reborn.Editor
             terrain.heightmapPixelError = 8f;
             terrain.basemapDistance = 2000f;
 
-            TerrainCollider collider = terrainObject.GetComponent<TerrainCollider>();
-            collider.terrainData = data;
-
-            // Temporary material. Real 17-texture TerrainLayers come in the next pass.
             Material material = new Material(Shader.Find("Universal Render Pipeline/Terrain/Lit"));
             material.name = "Blue1_Terrain_" + chunkName + "_Material";
             material.color = new Color(0.24f, 0.38f, 0.20f);
             terrain.materialTemplate = material;
         }
 
-        private static GameObject BuildPlayer(Transform mapRoot, float chunkSize)
+        private static GameObject BuildPlayer(Transform mapRoot)
         {
             string path = "Assets/Metin2/Characters/Warrior/Warrior_Novice.prefab";
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
@@ -196,7 +196,10 @@ namespace Metin2Reborn.Editor
             GameObject player = new GameObject("Warrior_Player");
             player.tag = "Player";
             player.transform.SetParent(mapRoot, false);
-            player.transform.localPosition = new Vector3(0f, 5f, 0f);
+
+            // The terrain is normalized to start at local Y=0, so a small
+            // positive spawn height places the player above the ground.
+            player.transform.localPosition = new Vector3(0f, 8f, 0f);
             player.transform.rotation = Quaternion.identity;
 
             visual.transform.SetParent(player.transform, true);
@@ -222,7 +225,7 @@ namespace Metin2Reborn.Editor
             Camera camera = cameraObject.AddComponent<Camera>();
             camera.fieldOfView = 55f;
             camera.nearClipPlane = 0.03f;
-            camera.farClipPlane = 1500f;
+            camera.farClipPlane = 2000f;
             cameraObject.transform.position = player.transform.position + new Vector3(0f, 5.2f, -7.5f);
             cameraObject.transform.LookAt(player.transform.position + Vector3.up);
 
