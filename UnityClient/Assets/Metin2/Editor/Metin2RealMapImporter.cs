@@ -21,7 +21,7 @@ namespace Metin2Reborn.Editor
         private const int SourceHeightResolution = 131;
         private const int UnityHeightResolution = 129;
         private const int TileRawResolution = 258;
-        private const int SplatResolution = 128;
+        private const int SplatResolution = 256;
         private const int TerrainTextureCount = 17;
 
         private const float WorldScale = 0.01f;
@@ -157,33 +157,24 @@ namespace Metin2Reborn.Editor
 
             float[,,] alpha = new float[SplatResolution, SplatResolution, TerrainTextureCount];
 
-            // tile.raw stores 258x258 texture indices. The usable splat area is
-            // the inner 256x256 region, which maps naturally to Unity's 128x128
-            // alphamap by reducing each 2x2 source block to its dominant texture.
+            // Metin2 tile.raw is a 258x258 byte texture-index map. The
+            // playable terrain area is the inner 256x256 region. The original
+            // client reads the rows from bottom to top and stores each byte as
+            // textureIndex = rawByte - 1. Preserve that mapping at full
+            // resolution instead of collapsing 2x2 cells into one material.
             for (int y = 0; y < SplatResolution; y++)
             {
+                int sourceY = TileRawResolution - 2 - y;
+
                 for (int x = 0; x < SplatResolution; x++)
                 {
-                    int[] counts = new int[TerrainTextureCount];
+                    int sourceX = x + 1;
+                    byte raw = bytes[sourceY * TileRawResolution + sourceX];
 
-                    for (int sy = 0; sy < 2; sy++)
-                    {
-                        for (int sx = 0; sx < 2; sx++)
-                        {
-                            int sourceX = 1 + x * 2 + sx;
-                            int sourceY = 1 + y * 2 + sy;
-                            byte raw = bytes[(TileRawResolution - 1 - sourceY) * TileRawResolution + sourceX];
-                            int textureIndex = raw == 0 ? 0 : raw - 1;
-                            textureIndex = Mathf.Clamp(textureIndex, 0, TerrainTextureCount - 1);
-                            counts[textureIndex]++;
-                        }
-                    }
+                    int textureIndex = raw - 1;
+                    textureIndex = Mathf.Clamp(textureIndex, 0, TerrainTextureCount - 1);
 
-                    int dominant = 0;
-                    for (int i = 1; i < TerrainTextureCount; i++)
-                        if (counts[i] > counts[dominant]) dominant = i;
-
-                    alpha[y, x, dominant] = 1f;
+                    alpha[y, x, textureIndex] = 1f;
                 }
             }
 
@@ -318,12 +309,23 @@ namespace Metin2Reborn.Editor
             terrain.drawInstanced = true;
             terrain.heightmapPixelError = 8f;
             terrain.basemapDistance = 2000f;
-            terrain.materialType = Terrain.MaterialType.BuiltInStandard;
-
-            Material material = new Material(Shader.Find("Universal Render Pipeline/Terrain/Lit"));
-            material.name = "Blue1_Terrain_" + chunkName + "_Material";
-            material.color = new Color(0.24f, 0.38f, 0.20f);
-            terrain.materialTemplate = material;
+            // Blue 1 uses the URP Terrain Lit shader. Do not tint the
+            // terrain with a generic material color: that was masking the
+            // imported splat textures and made the whole map brown.
+            Shader terrainShader = Shader.Find("Universal Render Pipeline/Terrain/Lit");
+            if (terrainShader != null)
+            {
+                Material material = new Material(terrainShader);
+                material.name = "Blue1_Terrain_" + chunkName + "_Material";
+                material.color = Color.white;
+                terrain.materialType = Terrain.MaterialType.Custom;
+                terrain.materialTemplate = material;
+            }
+            else
+            {
+                terrain.materialType = Terrain.MaterialType.BuiltInStandard;
+                terrain.materialTemplate = null;
+            }
         }
 
         private static GameObject BuildPlayer(Transform mapRoot)
