@@ -631,7 +631,7 @@ namespace Metin2Reborn.Editor
             {
                 float terrainY = best.SampleHeight(worldPoint) + best.GetPosition().y;
                 Vector3 local = player.transform.localPosition;
-                local.y = terrainY - mapRoot.position.y + 2.0f;
+                local.y = terrainY - mapRoot.position.y + 0.05f;
                 player.transform.localPosition = local;
             }
             else
@@ -650,8 +650,8 @@ namespace Metin2Reborn.Editor
             camera.fieldOfView = 55f;
             camera.nearClipPlane = 0.03f;
             camera.farClipPlane = 2000f;
-            cameraObject.transform.position = player.transform.position + new Vector3(0f, 3.8f, -5.5f);
-            cameraObject.transform.LookAt(player.transform.position + Vector3.up);
+            cameraObject.transform.position = player.transform.position + new Vector3(0f, 5.0f, -7.5f);
+            cameraObject.transform.LookAt(player.transform.position + Vector3.up * 1.1f);
 
             Metin2FollowCamera follow = cameraObject.AddComponent<Metin2FollowCamera>();
             follow.SetTarget(player.transform);
