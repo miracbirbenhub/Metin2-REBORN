@@ -629,7 +629,7 @@ namespace Metin2Reborn.Editor
                 if (!lines[i].TrimStart().StartsWith("Start Object", StringComparison.OrdinalIgnoreCase)) continue;
                 if (i + 3 >= lines.Length) continue;
 
-                string[] p = lines[i + 1].Trim().Split(new[] { ' ', '\\t' }, StringSplitOptions.RemoveEmptyEntries);
+                string[] p = lines[i + 1].Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
                 if (p.Length < 3) continue;
                 if (!float.TryParse(p[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float x)) continue;
                 if (!float.TryParse(p[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float y)) continue;
@@ -675,7 +675,7 @@ namespace Metin2Reborn.Editor
 
         private static string NormalizeModelKey(string value)
         {
-            string name = value.Replace('\\\\', '/');
+            string name = value.Replace('\\', '/');
             name = Path.GetFileNameWithoutExtension(name);
             int lod = name.IndexOf("_lod_", StringComparison.OrdinalIgnoreCase);
             if (lod >= 0) name = name.Substring(0, lod);
