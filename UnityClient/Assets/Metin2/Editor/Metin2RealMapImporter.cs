@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 
 namespace Metin2Reborn.Editor
 {
@@ -580,9 +581,9 @@ namespace Metin2Reborn.Editor
             float totalDepth = ChunkRows * 128f * CellScale * WorldScale;
             // Joan city center / City Guard area. The classic Joan map places the city around
             // (571, 558); our imported Blue 1 world uses the same local coordinate scale.
-            float cityX = 640f;
+            float cityX = 637f;
             float cityZ = 384f;
-            player.transform.localPosition = new Vector3(cityX, 150f, cityZ);
+            player.transform.localPosition = new Vector3(cityX, 28f, cityZ);
             player.transform.rotation = Quaternion.identity;
 
             visual.transform.SetParent(player.transform, false);
@@ -682,7 +683,7 @@ namespace Metin2Reborn.Editor
             {
                 eventSystem = new GameObject("EventSystem");
                 eventSystem.AddComponent<EventSystem>();
-                eventSystem.AddComponent<StandaloneInputModule>();
+                eventSystem.AddComponent<InputSystemUIInputModule>();
             }
 
             GameObject canvasObject = new GameObject("Mobile HUD");
