@@ -1,11 +1,16 @@
 param(
-    [string]$SourceRoot = "C:\Users\roxy\OneDrive\Masaüstü\Metin2BE-Client-master",
+    [string]$SourceRoot = "",
     [string]$MapRoot = "",
     [string]$ExportRoot = "",
     [switch]$CopyOnly
 )
 
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
+    $desktop = [Environment]::GetFolderPath("Desktop")
+    $SourceRoot = Join-Path $desktop "Metin2BE-Client-master"
+}
 
 if ([string]::IsNullOrWhiteSpace($MapRoot)) {
     $MapRoot = Join-Path $SourceRoot "metin2_map_empire\metin2_empire_blue_1"
@@ -16,6 +21,7 @@ if ([string]::IsNullOrWhiteSpace($ExportRoot)) {
 
 Write-Host ""
 Write-Host "BLUE 1 GEREKEN BINA MODELLERI HAZIRLAYICI" -ForegroundColor Cyan
+Write-Host "SourceRoot: $SourceRoot"
 Write-Host "MapRoot: $MapRoot"
 Write-Host "ExportRoot: $ExportRoot"
 Write-Host ""
