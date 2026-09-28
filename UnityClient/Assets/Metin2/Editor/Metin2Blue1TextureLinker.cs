@@ -92,6 +92,134 @@ namespace Metin2Reborn.Editor
             Debug.Log($"Metin2 Blue 1 texture link: {prefabCount} prefab, {rendererCount} renderer, {materialCount} material, {linked} texture baglantisi.");
         }
 
+        [MenuItem("Metin2/Blue 1/Force Source Texture Link")]
+        public static void ForceSourceLink()
+        {
+            AssetDatabase.Refresh();
+
+            var textures = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
+            foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { TextureRoot }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                if (tex != null)
+                    textures[Normalize(Path.GetFileNameWithoutExtension(path))] = tex;
+            }
+
+            int prefabCount = 0, rendererCount = 0, linked = 0;
+
+            foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { PrefabRoot }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (!path.Contains("/Blue1Required/")) continue;
+
+                GameObject prefab = PrefabUtility.LoadPrefabContents(path);
+                if (prefab == null) continue;
+
+                bool changed = false;
+                var family = FindSourceTextureFamily(textures, prefab.name);
+
+                foreach (var renderer in prefab.GetComponentsInChildren<Renderer>(true))
+                {
+                    Material[] materials = renderer.sharedMaterials;
+                    for (int i = 0; i < materials.Length; i++)
+                    {
+                        if (materials[i] == null || family.Count == 0) continue;
+
+                        Texture2D tex = null;
+                        string rendererKey = Normalize(renderer.name);
+                        string materialKey = Normalize(materials[i].name);
+
+                        foreach (var pair in family)
+                        {
+                            if ((!string.IsNullOrEmpty(rendererKey) && (pair.Key.Contains(rendererKey) || rendererKey.Contains(pair.Key))) ||
+                                (!string.IsNullOrEmpty(materialKey) && (pair.Key.Contains(materialKey) || materialKey.Contains(pair.Key))))
+                            {
+                                tex = pair.Value;
+                                break;
+                            }
+                        }
+
+                        if (tex == null)
+                            tex = family[Mathf.Clamp(i, 0, family.Count - 1)].Value;
+
+                        if (tex != null)
+                        {
+                            Material mat = new Material(materials[i]);
+                            mat.name = prefab.name + "_" + renderer.name + "_Source_" + i;
+                            SetTexture(mat, tex);
+
+                            string matPath = MaterialRoot + "/" + Sanitize(mat.name) + ".mat";
+                            Material existing = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+                            if (existing == null)
+                            {
+                                AssetDatabase.CreateAsset(mat, matPath);
+                                existing = mat;
+                            }
+                            else
+                            {
+                                UnityEngine.Object.DestroyImmediate(mat);
+                            }
+
+                            materials[i] = existing;
+                            linked++;
+                            changed = true;
+                        }
+                    }
+
+                    renderer.sharedMaterials = materials;
+                    rendererCount++;
+                }
+
+                if (changed)
+                {
+                    PrefabUtility.SaveAsPrefabAsset(prefab, path);
+                    prefabCount++;
+                }
+
+                PrefabUtility.UnloadPrefabContents(prefab);
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log($"Metin2 Blue 1 FORCE texture link: {prefabCount} prefab, {rendererCount} renderer, {linked} texture baglantisi.");
+        }
+
+        private static List<KeyValuePair<string, Texture2D>> FindSourceTextureFamily(Dictionary<string, Texture2D> textures, string prefabName)
+        {
+            var result = new List<KeyValuePair<string, Texture2D>>();
+            if (!Directory.Exists(SourceClientRoot)) return result;
+
+            string prefabKey = Normalize(prefabName);
+            foreach (string gr2 in Directory.GetFiles(SourceClientRoot, "*.gr2", SearchOption.AllDirectories))
+            {
+                if (!string.Equals(Normalize(Path.GetFileNameWithoutExtension(gr2)), prefabKey, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string dir = Path.GetDirectoryName(gr2);
+                if (string.IsNullOrEmpty(dir)) break;
+
+                string baseKey = Normalize(Path.GetFileNameWithoutExtension(gr2));
+                foreach (string dds in Directory.GetFiles(dir, "*.dds", SearchOption.TopDirectoryOnly))
+                {
+                    string key = Normalize(Path.GetFileNameWithoutExtension(dds));
+                    if (textures.TryGetValue(key, out var tex))
+                        result.Add(new KeyValuePair<string, Texture2D>(key, tex));
+                }
+
+                // Exact same-name texture gets priority and becomes the first slot.
+                result.Sort((a, b) => {
+                    bool ae = string.Equals(a.Key, baseKey, StringComparison.OrdinalIgnoreCase);
+                    bool be = string.Equals(b.Key, baseKey, StringComparison.OrdinalIgnoreCase);
+                    return be.CompareTo(ae);
+                });
+
+                break;
+            }
+
+            return result;
+        }
+
         private static Texture2D FindFamilyTexture(Dictionary<string, Texture2D> textures, string prefabName, string materialName, string rendererName, int slot)
         {
             if (!Directory.Exists(SourceClientRoot)) return null;
