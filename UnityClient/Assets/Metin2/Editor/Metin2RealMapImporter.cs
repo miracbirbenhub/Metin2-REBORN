@@ -380,60 +380,53 @@ namespace Metin2Reborn.Editor
                 throw new Exception(chunkName + " height.raw beklenmeyen boyutta: " + bytes.Length);
 
             ushort[,] source = new ushort[SourceHeightResolution, SourceHeightResolution];
-            ushort min = ushort.MaxValue;
-            ushort max = ushort.MinValue;
 
             for (int y = 0; y < SourceHeightResolution; y++)
             {
                 for (int x = 0; x < SourceHeightResolution; x++)
                 {
                     int index = (y * SourceHeightResolution + x) * 2;
-                    ushort value = BitConverter.ToUInt16(bytes, index);
-                    source[y, x] = value;
-                    if (value < min) min = value;
-                    if (value > max) max = value;
+                    source[y, x] = BitConverter.ToUInt16(bytes, index);
                 }
             }
+
+            // IMPORTANT: height.raw stores absolute terrain heights. The previous
+            // importer normalized each 256m chunk independently between its own
+            // min/max values, which destroyed the real mountain profile and made
+            // neighbouring chunks disagree in elevation. Metin2 uses:
+            // worldHeight = rawValue * HeightScale (0.5 cm units).
+            // Convert that directly to Unity metres.
+            const float terrainWorldHeight = 65535f * HeightScale * WorldScale;
 
             TerrainData data = new TerrainData
             {
                 heightmapResolution = UnityHeightResolution,
-                size = new Vector3(
-                    chunkSize,
-                    Mathf.Max(1f, (max - min) * HeightScale * WorldScale),
-                    chunkSize),
+                size = new Vector3(chunkSize, terrainWorldHeight, chunkSize),
                 baseMapResolution = 128,
                 alphamapResolution = SplatResolution
             };
 
             float[,] heights = new float[UnityHeightResolution, UnityHeightResolution];
-            float range = Mathf.Max(1f, max - min);
 
+            // height.raw is stored at 131x131 while Unity terrain uses the
+            // corresponding 129x129 vertex grid. The inner 129 samples are the
+            // actual terrain vertices; keep the same mapping for every chunk so
+            // the 20 sectors line up consistently.
             for (int y = 0; y < UnityHeightResolution; y++)
             {
                 for (int x = 0; x < UnityHeightResolution; x++)
                 {
                     ushort value = source[y + 1, x + 1];
-                    heights[y, x] = Mathf.Clamp01((value - min) / range);
+                    heights[y, x] = value / 65535f;
                 }
             }
 
             data.SetHeights(0, 0, heights);
 
-            // Use the original Metin2 minimap tile as the ground diffuse.
-            // minimap.dds is a 256x256 visual representation of each sectree,
-            // so this gives us an exact visual reference while we finish the
-            // proprietary tile.raw splat interpretation.
-            Texture2D minimap = ImportBlue1MinimapTexture(chunkName, chunkPath);
-            TerrainLayer minimapLayer = new TerrainLayer
-            {
-                diffuseTexture = minimap,
-                tileSize = new Vector2(chunkSize, chunkSize),
-                tileOffset = Vector2.zero
-            };
-            string layerAssetPath = DataRoot + "/TerrainLayers/Blue1_Minimap_" + chunkName + ".terrainlayer";
-            AssetDatabase.CreateAsset(minimapLayer, layerAssetPath);
-            data.terrainLayers = new[] { minimapLayer };
+            // Use the real Metin2 tile.raw texture index map instead of the
+            // minimap image. tile.raw is the terrain's 256x256 half-cell texture
+            // index grid (stored as 258x258 with a one-cell border).
+            ApplyBlue1TextureSplat(data, Path.Combine(chunkPath, "tile.raw"));
 
             string assetPath = DataRoot + "/Terrain_" + chunkName + ".asset";
             AssetDatabase.CreateAsset(data, assetPath);
@@ -451,7 +444,7 @@ namespace Metin2Reborn.Editor
 
             Terrain terrain = terrainObject.GetComponent<Terrain>();
             terrain.drawInstanced = true;
-            terrain.heightmapPixelError = 8f;
+            terrain.heightmapPixelError = 3f;
             terrain.basemapDistance = 2000f;
             // Blue 1 uses the URP Terrain Lit shader. Do not tint the
             // terrain with a generic material color: that was masking the
