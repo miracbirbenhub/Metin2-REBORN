@@ -217,8 +217,10 @@ namespace Metin2Reborn.Editor
                 string destination = Path.Combine(Application.dataPath, "Metin2/Generated/Maps/Blue1/Textures", name);
                 if (!File.Exists(source)) throw new Exception("Blue 1 texture bulunamadı: " + source);
                 File.Copy(source, destination, true);
+                string assetPath = "Assets/Metin2/Generated/Maps/Blue1/Textures/" + name;
+                AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
             }
-            AssetDatabase.Refresh();
+            AssetDatabase.SaveAssets();
             Debug.Log("Metin2: Blue 1 için 17 gerçek terrain DDS texture Unity projesine kopyalandı.");
         }
 
