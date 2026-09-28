@@ -2,7 +2,8 @@ param(
     [string]$SourceRoot = "",
     [string]$MapRoot = "",
     [string]$ExportRoot = "",
-    [switch]$CopyOnly,`n    [switch]$ConvertNow
+    [switch]$CopyOnly,
+    [switch]$ConvertNow
 )
 
 $ErrorActionPreference = "Stop"
