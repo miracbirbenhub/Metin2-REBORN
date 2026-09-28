@@ -154,34 +154,76 @@ namespace Metin2Reborn.Editor
             if (bytes.Length != TileRawResolution * TileRawResolution)
                 throw new Exception("tile.raw beklenmeyen boyutta: " + bytes.Length);
 
-            // URP Terrain Lit supports up to 8 terrain layers. Blue 1's
-            // tile.raw currently uses only raw values 1,4,5,6,8,11, so we
-            // keep exactly those six source textures and remap them to slots 0-5.
-            int[] sourceValues = { 1, 4, 5, 6, 8, 11 };
-            TerrainLayer[] layers = new TerrainLayer[sourceValues.Length];
-            for (int i = 0; i < sourceValues.Length; i++)
+            // tile.raw stores the actual TextureSet index (1..17). Do NOT use
+            // a hard-coded global list: different Blue 1 chunks can use
+            // different subsets of the 17 textures. Unknown values were
+            // previously forced to slot 0, which turned large parts of the
+            // map into the brown field texture.
+            List<int> usedValues = new List<int>();
+            for (int i = 0; i < bytes.Length; i++)
             {
+                int value = bytes[i];
+                if (value < 1 || value > TerrainTextureCount) continue;
+                if (!usedValues.Contains(value))
+                    usedValues.Add(value);
+            }
+            usedValues.Sort();
+
+            if (usedValues.Count == 0)
+                throw new Exception("tile.raw içinde geçerli Blue 1 texture index bulunamadı: " + tilePath);
+
+            // Unity/URP terrain uses a limited number of layers per terrain
+            // pass. Blue 1 sectors normally stay below this limit.
+            if (usedValues.Count > 8)
+                throw new Exception("Blue 1 chunk 8'den fazla terrain texture kullanıyor: " +
+                                    Path.GetFileName(Path.GetDirectoryName(tilePath)) +
+                                    " -> " + string.Join(",", usedValues));
+
+            TerrainLayer[] layers = new TerrainLayer[usedValues.Count];
+            for (int i = 0; i < usedValues.Count; i++)
+            {
+                int sourceValue = usedValues[i];
                 string path = DataRoot + "/TerrainLayers/Blue1_" +
-                              (sourceValues[i] - 1).ToString("D2") + ".terrainlayer";
+                              (sourceValue - 1).ToString("D2") + ".terrainlayer";
                 layers[i] = AssetDatabase.LoadAssetAtPath<TerrainLayer>(path);
                 if (layers[i] == null)
                     throw new Exception("Blue 1 TerrainLayer bulunamadı: " + path);
             }
             data.terrainLayers = layers;
 
-            float[,,] alpha = new float[SplatResolution, SplatResolution, sourceValues.Length];
+            float[,,] alpha = new float[SplatResolution, SplatResolution, layers.Length];
 
             for (int y = 0; y < SplatResolution; y++)
             {
+                // tile.raw has a one-cell border around its 256x256 payload.
+                // Keep the same orientation used by the source map.
                 int sourceY = TileRawResolution - 2 - y;
 
                 for (int x = 0; x < SplatResolution; x++)
                 {
                     int sourceX = x + 1;
-                    byte raw = bytes[sourceY * TileRawResolution + sourceX];
+                    int raw = bytes[sourceY * TileRawResolution + sourceX];
 
-                    int slot = Array.IndexOf(sourceValues, (int)raw);
-                    if (slot < 0) slot = 0;
+                    int slot = usedValues.IndexOf(raw);
+
+                    // Border/unused values can exist in tile.raw. Find the
+                    // nearest valid texture index instead of blindly using
+                    // grass/brown slot 0.
+                    if (slot < 0)
+                    {
+                        int nearest = usedValues[0];
+                        int distance = Mathf.Abs(raw - nearest);
+                        for (int i = 1; i < usedValues.Count; i++)
+                        {
+                            int d = Mathf.Abs(raw - usedValues[i]);
+                            if (d < distance)
+                            {
+                                distance = d;
+                                nearest = usedValues[i];
+                            }
+                        }
+                        slot = usedValues.IndexOf(nearest);
+                    }
 
                     alpha[y, x, slot] = 1f;
                 }
