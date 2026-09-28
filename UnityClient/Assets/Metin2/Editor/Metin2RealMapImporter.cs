@@ -20,6 +20,9 @@ namespace Metin2Reborn.Editor
         private const int ChunkRows = 4;
         private const int SourceHeightResolution = 131;
         private const int UnityHeightResolution = 129;
+        private const int TileRawResolution = 258;
+        private const int SplatResolution = 128;
+        private const int TerrainTextureCount = 17;
 
         private const float WorldScale = 0.01f;
         private const float CellScale = 200f;
@@ -44,6 +47,8 @@ namespace Metin2Reborn.Editor
                 Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
                 BuildLighting();
                 ImportBlue1Textures();
+                AssetDatabase.Refresh();
+                CreateBlue1TerrainLayers();
 
                 float chunkSize = 128f * CellScale * WorldScale;
                 float totalWidth = ChunkColumns * chunkSize;
@@ -86,6 +91,101 @@ namespace Metin2Reborn.Editor
             {
                 AssetDatabase.StopAssetEditing();
             }
+        }
+
+        private static void CreateBlue1TerrainLayers()
+        {
+            string layerRoot = DataRoot + "/TerrainLayers";
+            EnsureFolder(layerRoot);
+
+            Texture2D[] textures = new Texture2D[TerrainTextureCount];
+            TerrainLayer[] layers = new TerrainLayer[TerrainTextureCount];
+
+            string[] files =
+            {
+                "field 01.dds", "field 02.dds", "field 03.dds", "field 04.dds",
+                "grass 01.dds", "grass 02.dds", "grass 03.dds",
+                "stone01.dds", "stone02.dds", "stone03.dds", "stone04.dds",
+                "tile01.dds", "tile02.dds", "tile03.dds",
+                "beach sand 01.dds", "beach sand 02.dds", "beach sand 03.dds"
+            };
+
+            for (int i = 0; i < TerrainTextureCount; i++)
+            {
+                string texturePath = "Assets/Metin2/Generated/Maps/Blue1/Textures/" + files[i];
+                textures[i] = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+                if (textures[i] == null)
+                    throw new Exception("Blue 1 texture Unity asset olarak yüklenemedi: " + texturePath);
+
+                string layerPath = layerRoot + "/Blue1_" + i.ToString("D2") + ".terrainlayer";
+                TerrainLayer layer = AssetDatabase.LoadAssetAtPath<TerrainLayer>(layerPath);
+                if (layer == null)
+                {
+                    layer = new TerrainLayer();
+                    AssetDatabase.CreateAsset(layer, layerPath);
+                }
+
+                layer.diffuseTexture = textures[i];
+                layer.tileSize = new Vector2(20f, 20f);
+                layer.tileOffset = Vector2.zero;
+                EditorUtility.SetDirty(layer);
+                layers[i] = layer;
+            }
+
+            AssetDatabase.SaveAssets();
+            Debug.Log("Metin2: Blue 1 için 17 TerrainLayer oluşturuldu.");
+        }
+
+        private static void ApplyBlue1TextureSplat(TerrainData data, string tilePath)
+        {
+            if (!File.Exists(tilePath))
+                throw new Exception("tile.raw bulunamadı: " + tilePath);
+
+            byte[] bytes = File.ReadAllBytes(tilePath);
+            if (bytes.Length != TileRawResolution * TileRawResolution)
+                throw new Exception("tile.raw beklenmeyen boyutta: " + bytes.Length);
+
+            TerrainLayer[] layers = new TerrainLayer[TerrainTextureCount];
+            for (int i = 0; i < TerrainTextureCount; i++)
+            {
+                string path = DataRoot + "/TerrainLayers/Blue1_" + i.ToString("D2") + ".terrainlayer";
+                layers[i] = AssetDatabase.LoadAssetAtPath<TerrainLayer>(path);
+            }
+            data.terrainLayers = layers;
+
+            float[,,] alpha = new float[SplatResolution, SplatResolution, TerrainTextureCount];
+
+            // tile.raw stores 258x258 texture indices. The usable splat area is
+            // the inner 256x256 region, which maps naturally to Unity's 128x128
+            // alphamap by reducing each 2x2 source block to its dominant texture.
+            for (int y = 0; y < SplatResolution; y++)
+            {
+                for (int x = 0; x < SplatResolution; x++)
+                {
+                    int[] counts = new int[TerrainTextureCount];
+
+                    for (int sy = 0; sy < 2; sy++)
+                    {
+                        for (int sx = 0; sx < 2; sx++)
+                        {
+                            int sourceX = 1 + x * 2 + sx;
+                            int sourceY = 1 + y * 2 + sy;
+                            byte raw = bytes[(TileRawResolution - 1 - sourceY) * TileRawResolution + sourceX];
+                            int textureIndex = raw == 0 ? 0 : raw - 1;
+                            textureIndex = Mathf.Clamp(textureIndex, 0, TerrainTextureCount - 1);
+                            counts[textureIndex]++;
+                        }
+                    }
+
+                    int dominant = 0;
+                    for (int i = 1; i < TerrainTextureCount; i++)
+                        if (counts[i] > counts[dominant]) dominant = i;
+
+                    alpha[y, x, dominant] = 1f;
+                }
+            }
+
+            data.SetAlphamaps(0, 0, alpha);
         }
 
         private static void BuildLighting()
@@ -162,7 +262,7 @@ namespace Metin2Reborn.Editor
                     Mathf.Max(1f, (max - min) * HeightScale * WorldScale),
                     chunkSize),
                 baseMapResolution = 128,
-                alphamapResolution = 128
+                alphamapResolution = SplatResolution
             };
 
             float[,] heights = new float[UnityHeightResolution, UnityHeightResolution];
@@ -178,6 +278,7 @@ namespace Metin2Reborn.Editor
             }
 
             data.SetHeights(0, 0, heights);
+            ApplyBlue1TextureSplat(data, Path.Combine(chunkPath, "tile.raw"));
 
             string assetPath = DataRoot + "/Terrain_" + chunkName + ".asset";
             AssetDatabase.CreateAsset(data, assetPath);
@@ -197,6 +298,7 @@ namespace Metin2Reborn.Editor
             terrain.drawInstanced = true;
             terrain.heightmapPixelError = 8f;
             terrain.basemapDistance = 2000f;
+            terrain.materialType = Terrain.MaterialType.BuiltInStandard;
 
             Material material = new Material(Shader.Find("Universal Render Pipeline/Terrain/Lit"));
             material.name = "Blue1_Terrain_" + chunkName + "_Material";
