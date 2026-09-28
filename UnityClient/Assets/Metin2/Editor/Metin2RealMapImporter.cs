@@ -595,9 +595,11 @@ namespace Metin2Reborn.Editor
         private static Dictionary<string, GameObject> LoadGeneratedObjectPrefabs()
         {
             Dictionary<string, GameObject> result = new Dictionary<string, GameObject>(StringComparer.OrdinalIgnoreCase);
-            string root = "Assets/Metin2/Generated/Prefabs";
-            string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { root });
-            foreach (string guid in guids)
+
+            // First use generated prefabs.
+            string prefabRoot = "Assets/Metin2/Generated/Prefabs";
+            string[] prefabGuids = AssetDatabase.FindAssets("t:Prefab", new[] { prefabRoot });
+            foreach (string guid in prefabGuids)
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
@@ -606,7 +608,22 @@ namespace Metin2Reborn.Editor
                 string key = NormalizeModelKey(prefab.name);
                 if (!result.ContainsKey(key)) result.Add(key, prefab);
             }
-            Debug.Log("Metin2: Source object prefab indexi: " + result.Count);
+
+            // Also index raw FBX/model assets imported from the Blue 1 required-model set.
+            // These do not need to be converted into prefabs before AreaData placement.
+            string modelRoot = "Assets/Metin2/Imported/Blue1Required";
+            string[] modelGuids = AssetDatabase.FindAssets("t:Model", new[] { modelRoot });
+            foreach (string guid in modelGuids)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (model == null) continue;
+
+                string key = NormalizeModelKey(model.name);
+                if (!result.ContainsKey(key)) result.Add(key, model);
+            }
+
+            Debug.Log("Metin2: Source object model indexi: " + result.Count);
             return result;
         }
 
