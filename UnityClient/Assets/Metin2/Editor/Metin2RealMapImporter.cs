@@ -76,6 +76,7 @@ namespace Metin2Reborn.Editor
                 GameObject player = BuildPlayer(mapRoot.transform);
                 BuildCamera(player);
                 BuildFallbackEnvironment();
+                BuildBlue1EnvironmentObjects(mapRoot.transform, chunkSize);
 
                 EditorSceneManager.SaveScene(scene, ScenePath);
                 AssetDatabase.SaveAssets();
@@ -460,6 +461,95 @@ namespace Metin2Reborn.Editor
             material.name = "Blue1_Terrain_" + chunkName + "_Material";
             terrain.materialType = Terrain.MaterialType.Custom;
             terrain.materialTemplate = material;
+        }
+
+        private static void BuildBlue1EnvironmentObjects(Transform mapRoot, float chunkSize)
+        {
+            const string prefabRoot = "Assets/Metin2/Generated/Prefabs/Other";
+            string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { prefabRoot });
+            if (guids.Length == 0)
+            {
+                Debug.LogWarning("Blue 1: Other prefab bulunamadı; dekorasyon atlandı.");
+                return;
+            }
+
+            // Prefer obvious world-decoration names. If the imported client build
+            // uses different names, fall back to the first available Other prefabs.
+            System.Collections.Generic.List<GameObject> candidates = new System.Collections.Generic.List<GameObject>();
+            foreach (string guid in guids)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (prefab == null) continue;
+
+                string n = prefab.name.ToLowerInvariant();
+                if (n.Contains("tree") || n.Contains("rock") || n.Contains("stone") ||
+                    n.Contains("bush") || n.Contains("grass") || n.Contains("flower") ||
+                    n.Contains("wood") || n.Contains("fence") || n.Contains("house") ||
+                    n.Contains("building") || n.Contains("object"))
+                {
+                    candidates.Add(prefab);
+                }
+            }
+
+            if (candidates.Count == 0)
+            {
+                foreach (string guid in guids)
+                {
+                    GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
+                    if (prefab != null) candidates.Add(prefab);
+                }
+            }
+
+            GameObject root = new GameObject("BLUE_1_WORLD_OBJECTS");
+            root.transform.SetParent(mapRoot, false);
+
+            System.Random random = new System.Random(1001);
+            int placed = 0;
+
+            for (int row = 0; row < ChunkRows; row++)
+            {
+                for (int col = 0; col < ChunkColumns; col++)
+                {
+                    int count = 3;
+                    for (int i = 0; i < count; i++)
+                    {
+                        GameObject prefab = candidates[random.Next(candidates.Count)];
+                        float x = col * chunkSize + 12f + (float)random.NextDouble() * (chunkSize - 24f);
+                        float z = row * chunkSize + 12f + (float)random.NextDouble() * (chunkSize - 24f);
+
+                        // Avoid the central player spawn area.
+                        float localX = x - (ChunkColumns * chunkSize * 0.5f);
+                        float localZ = z - (ChunkRows * chunkSize * 0.5f);
+                        if (localX * localX + localZ * localZ < 35f * 35f)
+                            continue;
+
+                        GameObject instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+                        if (instance == null) continue;
+
+                        instance.name = "Blue1_Object_" + placed.ToString("D3") + "_" + prefab.name;
+                        instance.transform.SetParent(root.transform, false);
+                        instance.transform.localPosition = new Vector3(
+                            x - (ChunkColumns * chunkSize * 0.5f),
+                            0f,
+                            z - (ChunkRows * chunkSize * 0.5f));
+                        instance.transform.localRotation = Quaternion.Euler(0f, (float)random.NextDouble() * 360f, 0f);
+
+                        // Scale imported client props into the same meter convention
+                        // as the map. Keep the source scale when it is already sane.
+                        Vector3 s = instance.transform.localScale;
+                        float maxAxis = Mathf.Max(Mathf.Abs(s.x), Mathf.Abs(s.y), Mathf.Abs(s.z));
+                        if (maxAxis > 20f)
+                            instance.transform.localScale = s * 0.01f;
+                        else if (maxAxis < 0.01f)
+                            instance.transform.localScale = s * 100f;
+
+                        placed++;
+                    }
+                }
+            }
+
+            Debug.Log("Metin2: Blue 1 dekorasyon objeleri yerleştirildi: " + placed);
         }
 
         private static GameObject BuildPlayer(Transform mapRoot)
