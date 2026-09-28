@@ -5,6 +5,8 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 namespace Metin2Reborn.Editor
 {
@@ -75,6 +77,7 @@ namespace Metin2Reborn.Editor
 
                 GameObject player = BuildPlayer(mapRoot.transform);
                 BuildCamera(player);
+                BuildMobileHUD(player);
                 BuildFallbackEnvironment();
                 BuildBlue1EnvironmentObjects(mapRoot.transform, chunkSize);
 
@@ -670,6 +673,90 @@ namespace Metin2Reborn.Editor
 
             Metin2FollowCamera follow = cameraObject.AddComponent<Metin2FollowCamera>();
             follow.SetTarget(player.transform);
+        }
+
+        private static void BuildMobileHUD(GameObject player)
+        {
+            GameObject eventSystem = GameObject.Find("EventSystem");
+            if (eventSystem == null)
+            {
+                eventSystem = new GameObject("EventSystem");
+                eventSystem.AddComponent<EventSystem>();
+                eventSystem.AddComponent<StandaloneInputModule>();
+            }
+
+            GameObject canvasObject = new GameObject("Mobile HUD");
+            Canvas canvas = canvasObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 100;
+            CanvasScaler scaler = canvasObject.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+            canvasObject.AddComponent<GraphicRaycaster>();
+
+            GameObject joystickObject = new GameObject("Movement Joystick");
+            joystickObject.transform.SetParent(canvasObject.transform, false);
+            RectTransform joystickRect = joystickObject.AddComponent<RectTransform>();
+            joystickRect.anchorMin = new Vector2(0f, 0f);
+            joystickRect.anchorMax = new Vector2(0f, 0f);
+            joystickRect.pivot = new Vector2(0.5f, 0.5f);
+            joystickRect.sizeDelta = new Vector2(190f, 190f);
+            joystickRect.anchoredPosition = new Vector2(145f, 145f);
+
+            Image joystickImage = joystickObject.AddComponent<Image>();
+            joystickImage.sprite = GetOrCreateCircleSprite("Joystick_Background", 190, 0.38f);
+            joystickImage.raycastTarget = true;
+
+            GameObject handleObject = new GameObject("Handle");
+            handleObject.transform.SetParent(joystickObject.transform, false);
+            RectTransform handleRect = handleObject.AddComponent<RectTransform>();
+            handleRect.anchorMin = new Vector2(0.5f, 0.5f);
+            handleRect.anchorMax = new Vector2(0.5f, 0.5f);
+            handleRect.pivot = new Vector2(0.5f, 0.5f);
+            handleRect.sizeDelta = new Vector2(82f, 82f);
+            handleRect.anchoredPosition = Vector2.zero;
+            Image handleImage = handleObject.AddComponent<Image>();
+            handleImage.sprite = GetOrCreateCircleSprite("Joystick_Handle", 82, 0.75f);
+            handleImage.raycastTarget = false;
+
+            Metin2VirtualJoystick joystick = joystickObject.AddComponent<Metin2VirtualJoystick>();
+            joystick.SetPlayer(player.GetComponent<Metin2PlayerController>());
+
+            Debug.Log("Metin2: Mobile joystick oluşturuldu ve Warrior'a bağlandı.");
+        }
+
+        private static Sprite GetOrCreateCircleSprite(string name, int size, float alpha)
+        {
+            string path = "Assets/Metin2/Generated/" + name + ".png";
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (texture == null)
+            {
+                texture = new Texture2D(size, size, TextureFormat.RGBA32, false, true);
+                Color32[] pixels = new Color32[size * size];
+                float center = (size - 1) * 0.5f;
+                float radius = center - 2f;
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        float dx = x - center;
+                        float dy = y - center;
+                        float distance = Mathf.Sqrt(dx * dx + dy * dy);
+                        byte a = (byte)(Mathf.Clamp01((radius + 1f - distance)) * 255f * alpha);
+                        pixels[y * size + x] = new Color32(255, 255, 255, a);
+                    }
+                }
+                texture.SetPixels32(pixels);
+                texture.Apply(false, false);
+                byte[] png = texture.EncodeToPNG();
+                UnityEngine.Object.DestroyImmediate(texture);
+                File.WriteAllBytes(Path.Combine(Application.dataPath, "Metin2/Generated/" + name + ".png"), png);
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+                texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            }
+
+            return Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), 100f);
         }
 
         private static void BuildFallbackEnvironment()
