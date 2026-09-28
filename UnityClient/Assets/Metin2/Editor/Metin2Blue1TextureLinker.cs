@@ -63,7 +63,7 @@ namespace Metin2Reborn.Editor
 
                         Texture2D tex = FindTexture(textures, source.name, renderer.name, prefab.name, AssetDatabase.GetAssetPath(source));
                         if (tex == null)
-                            tex = FindNearbySourceTexture(textures, prefab.name, source.name, renderer.name);
+                            tex = FindFamilyTexture(textures, prefab.name, source.name, renderer.name, i);
                         if (tex != null)
                         {
                             SetTexture(existing, tex);
@@ -92,58 +92,43 @@ namespace Metin2Reborn.Editor
             Debug.Log($"Metin2 Blue 1 texture link: {prefabCount} prefab, {rendererCount} renderer, {materialCount} material, {linked} texture baglantisi.");
         }
 
-        private static Texture2D FindNearbySourceTexture(Dictionary<string, Texture2D> textures, string prefabName, string materialName, string rendererName)
+        private static Texture2D FindFamilyTexture(Dictionary<string, Texture2D> textures, string prefabName, string materialName, string rendererName, int slot)
         {
             if (!Directory.Exists(SourceClientRoot)) return null;
-
-            string targetKey = Normalize(prefabName);
-            string materialKey = Normalize(materialName);
-            string rendererKey = Normalize(rendererName);
+            string prefabKey = Normalize(prefabName);
+            if (string.IsNullOrEmpty(prefabKey)) return null;
 
             foreach (string gr2 in Directory.GetFiles(SourceClientRoot, "*.gr2", SearchOption.AllDirectories))
             {
-                if (!string.Equals(Normalize(Path.GetFileNameWithoutExtension(gr2)), targetKey, StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(Normalize(Path.GetFileNameWithoutExtension(gr2)), prefabKey, StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 string dir = Path.GetDirectoryName(gr2);
                 if (string.IsNullOrEmpty(dir)) return null;
 
-                string[] nearby = Directory.GetFiles(dir, "*.dds", SearchOption.AllDirectories);
-                Texture2D fallback = null;
-
-                foreach (string dds in nearby)
+                var candidates = new List<KeyValuePair<string, Texture2D>>();
+                foreach (string dds in Directory.GetFiles(dir, "*.dds", SearchOption.TopDirectoryOnly))
                 {
                     string key = Normalize(Path.GetFileNameWithoutExtension(dds));
-                    if (string.IsNullOrEmpty(key)) continue;
-
-                    if (!string.IsNullOrEmpty(materialKey) &&
-                        (key.Contains(materialKey) || materialKey.Contains(key)))
-                    {
-                        string unityPath = FindUnityTexturePath(textures, key);
-                        if (unityPath != null) return textures[key];
-                    }
-
-                    if (!string.IsNullOrEmpty(rendererKey) &&
-                        (key.Contains(rendererKey) || rendererKey.Contains(key)))
-                    {
-                        string unityPath = FindUnityTexturePath(textures, key);
-                        if (unityPath != null) return textures[key];
-                    }
-
-                    string unityKey = key;
-                    if (textures.TryGetValue(unityKey, out var candidate))
-                        fallback = candidate;
+                    if (textures.TryGetValue(key, out var tex))
+                        candidates.Add(new KeyValuePair<string, Texture2D>(key, tex));
                 }
 
-                return fallback;
+                if (candidates.Count == 0) return null;
+
+                string materialKey = Normalize(materialName);
+                string rendererKey = Normalize(rendererName);
+
+                foreach (var candidate in candidates)
+                {
+                    if ((!string.IsNullOrEmpty(materialKey) && (candidate.Key.Contains(materialKey) || materialKey.Contains(candidate.Key))) ||
+                        (!string.IsNullOrEmpty(rendererKey) && (candidate.Key.Contains(rendererKey) || rendererKey.Contains(candidate.Key))))
+                        return candidate.Value;
+                }
+
+                return candidates[Mathf.Clamp(slot, 0, candidates.Count - 1)].Value;
             }
-
             return null;
-        }
-
-        private static string FindUnityTexturePath(Dictionary<string, Texture2D> textures, string key)
-        {
-            return textures.ContainsKey(key) ? key : null;
         }
 
         private static Texture2D FindTexture(Dictionary<string, Texture2D> textures, params string[] names)
