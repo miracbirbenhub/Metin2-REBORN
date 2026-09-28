@@ -574,8 +574,50 @@ namespace Metin2Reborn.Editor
                 }
             }
 
+            BuildBlue1ChunkDebugMarker(mapRoot, chunkSize, 2, 1);
             Debug.Log("Metin2: Blue 1 gerçek AreaData objeleri: " + placed + " yerleştirildi. " +
-                      "Property çözülemedi: " + unresolvedProperty + ", prefab bulunamadı: " + unresolvedPrefab);
+                      "Property çözülemedi: " + unresolvedProperty + ", prefab bulunamadı: " + unresolvedPrefab +
+                      ". DEBUG: Terrain_001002 merkezi (640,384).");
+        }
+
+        private static void BuildBlue1ChunkDebugMarker(Transform mapRoot, float chunkSize, int col, int row)
+        {
+            // Temporary visual guide: exact Terrain_001002 footprint and center.
+            GameObject root = new GameObject("BLUE1_DEBUG_001002");
+            root.transform.SetParent(mapRoot, false);
+
+            float x = col * chunkSize;
+            float z = row * chunkSize;
+            GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            marker.name = "Terrain001002_DebugFrame";
+            marker.transform.SetParent(root.transform, false);
+            marker.transform.localPosition = new Vector3(x + chunkSize * 0.5f, 0.05f, z + chunkSize * 0.5f);
+            marker.transform.localScale = new Vector3(chunkSize, 0.1f, chunkSize);
+
+            Collider collider = marker.GetComponent<Collider>();
+            if (collider != null) UnityEngine.Object.DestroyImmediate(collider);
+
+            Renderer renderer = marker.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                Material material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                material.SetColor("_BaseColor", new Color(1f, 0.75f, 0f, 0.12f));
+                material.SetFloat("_Surface", 1f);
+                material.SetFloat("_Blend", 0f);
+                material.renderQueue = 3000;
+                renderer.sharedMaterial = material;
+            }
+
+            GameObject center = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            center.name = "Terrain001002_Center_Debug";
+            center.transform.SetParent(root.transform, false);
+            center.transform.localPosition = new Vector3(x + chunkSize * 0.5f, 0.4f, z + chunkSize * 0.5f);
+            center.transform.localScale = new Vector3(2f, 0.4f, 2f);
+
+            Collider centerCollider = center.GetComponent<Collider>();
+            if (centerCollider != null) UnityEngine.Object.DestroyImmediate(centerCollider);
+
+            Debug.Log("Metin2: DEBUG Terrain001002 -> X 512..768, Z 256..512, merkez 640,384.");
         }
 
         private static Dictionary<uint, SourceObjectProperty> LoadSourceProperties(string clientRoot)
@@ -850,7 +892,9 @@ namespace Metin2Reborn.Editor
             camera.fieldOfView = 55f;
             camera.nearClipPlane = 0.03f;
             camera.farClipPlane = 2000f;
-            cameraObject.transform.position = player.transform.position + new Vector3(0f, 5.0f, -7.5f);
+            // Start close to the exact center of Terrain001002 so the source
+            // object placement can be checked without navigating the whole map.
+            cameraObject.transform.position = player.transform.position + new Vector3(0f, 8.0f, -12.0f);
             cameraObject.transform.LookAt(player.transform.position + Vector3.up * 1.1f);
 
             Metin2FollowCamera follow = cameraObject.AddComponent<Metin2FollowCamera>();
