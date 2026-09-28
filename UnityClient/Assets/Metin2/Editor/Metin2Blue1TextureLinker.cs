@@ -60,7 +60,7 @@ namespace Metin2Reborn.Editor
                             materialCount++;
                         }
 
-                        Texture2D tex = FindTexture(textures, source.name, renderer.name, prefab.name);
+                        Texture2D tex = FindTexture(textures, source.name, renderer.name, prefab.name, AssetDatabase.GetAssetPath(source));
                         if (tex != null)
                         {
                             SetTexture(existing, tex);
