@@ -253,31 +253,66 @@ namespace Metin2Reborn.Editor
             if (!File.Exists(source))
                 throw new Exception("minimap.dds bulunamadı: " + source);
 
+            // Blue 1 minimap.dds files are the classic 256x256 uncompressed
+            // X8R8G8B8 DDS variant (128-byte header + 256*256*4 bytes).
+            // Unity may reject these legacy DDS files, so decode them here and
+            // save a normal PNG that Unity can import reliably.
+            byte[] dds = File.ReadAllBytes(source);
+            if (dds.Length < 128 + 256 * 256 * 4)
+                throw new Exception("minimap.dds beklenenden küçük: " + source);
+
+            if (dds[0] != (byte)'D' || dds[1] != (byte)'D' || dds[2] != (byte)'S' || dds[3] != (byte)' ')
+                throw new Exception("Geçersiz DDS header: " + source);
+
+            int width = BitConverter.ToInt32(dds, 16);
+            int height = BitConverter.ToInt32(dds, 12);
+            int rgbBitCount = BitConverter.ToInt32(dds, 88);
+            if (width != 256 || height != 256 || rgbBitCount != 32)
+                throw new Exception($"Blue 1 minimap DDS formatı beklenen X8R8G8B8 değil: {width}x{height}, {rgbBitCount} bit.");
+
+            Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false, false);
+            Color32[] pixels = new Color32[width * height];
+
+            int offset = 128;
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int i = offset + ((y * width + x) * 4);
+                    byte b = dds[i + 0];
+                    byte g = dds[i + 1];
+                    byte r = dds[i + 2];
+                    pixels[(height - 1 - y) * width + x] = new Color32(r, g, b, 255);
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply(false, false);
+
             string folder = "Assets/Metin2/Generated/Maps/Blue1/Minimap";
             EnsureFolder(folder);
+            string pngAssetPath = folder + "/minimap_" + chunkName + ".png";
+            string pngFilePath = Path.Combine(Application.dataPath, "Metin2/Generated/Maps/Blue1/Minimap/minimap_" + chunkName + ".png");
+            File.WriteAllBytes(pngFilePath, texture.EncodeToPNG());
+            UnityEngine.Object.DestroyImmediate(texture);
 
-            string fileName = "minimap_" + chunkName + ".dds";
-            string destination = Path.Combine(Application.dataPath, "Metin2/Generated/Maps/Blue1/Minimap", fileName);
-            File.Copy(source, destination, true);
-
-            string assetPath = folder + "/" + fileName;
-            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport);
-
-            TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+            AssetDatabase.ImportAsset(pngAssetPath, ImportAssetOptions.ForceSynchronousImport);
+            TextureImporter importer = AssetImporter.GetAtPath(pngAssetPath) as TextureImporter;
             if (importer != null)
             {
                 importer.textureType = TextureImporterType.Default;
+                importer.sRGBTexture = true;
                 importer.wrapMode = TextureWrapMode.Clamp;
                 importer.filterMode = FilterMode.Bilinear;
                 importer.mipmapEnabled = true;
                 importer.SaveAndReimport();
             }
 
-            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
-            if (texture == null)
-                throw new Exception("minimap.dds Unity texture olarak yüklenemedi: " + assetPath);
+            Texture2D imported = AssetDatabase.LoadAssetAtPath<Texture2D>(pngAssetPath);
+            if (imported == null)
+                throw new Exception("minimap PNG Unity texture olarak yüklenemedi: " + pngAssetPath);
 
-            return texture;
+            return imported;
         }
 
         private static void CreateTerrainChunk(
