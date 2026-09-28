@@ -36,6 +36,12 @@ namespace Metin2Reborn.Editor
         [MenuItem("Metin2/Import REAL Blue 1 Map")]
         public static void ImportBlue1()
         {
+            if (EditorApplication.isPlaying)
+            {
+                Debug.LogWarning("Metin2: Blue 1 import Play Mode içinde çalıştırılamaz. Önce Play Mode'dan çık.");
+                EditorApplication.isPlaying = false;
+                return;
+            }
             if (!Directory.Exists(SourceMap))
                 throw new Exception("Blue 1 source map bulunamadı: " + SourceMap);
 
