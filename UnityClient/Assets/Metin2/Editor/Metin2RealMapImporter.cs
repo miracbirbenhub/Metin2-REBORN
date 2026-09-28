@@ -787,6 +787,7 @@ namespace Metin2Reborn.Editor
             float cityZ = 384f;
             player.transform.localPosition = new Vector3(cityX, 28f, cityZ);
             player.transform.rotation = Quaternion.identity;
+            PlacePlayerOnTerrain(player, mapRoot, cityX, cityZ);
 
             visual.transform.SetParent(player.transform, false);
             visual.transform.localPosition = Vector3.zero;
