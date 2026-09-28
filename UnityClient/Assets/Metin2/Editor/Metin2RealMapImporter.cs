@@ -200,28 +200,27 @@ namespace Metin2Reborn.Editor
 
         private static void ImportBlue1Textures()
         {
-            string sourceRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Metin2BE-Client-master\\objects\\ymir work\\terrainmaps\\b");
+            string sourceRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Metin2BE-Client-master\\_BLUE1_PNG");
             string[] files =
             {
-                "field\\field 01.png","field\\field 02.dds","field\\field 03.dds","field\\field 04.dds",
-                "grass\\grass 01.dds","grass\\grass 02.dds","grass\\grass 03.dds",
-                "stone\\stone01.dds","stone\\stone02.dds","stone\\stone03.dds","stone\\stone04.dds",
-                "tile\\tile01.dds","tile\\tile02.dds","tile\\tile03.dds",
-                "beach\\beach sand 01.dds","beach\\beach sand 02.dds","beach\\beach sand 03.dds"
+                "field 01.png","field 02.png","field 03.png","field 04.png",
+                "grass 01.png","grass 02.png","grass 03.png",
+                "stone01.png","stone02.png","stone03.png","stone04.png",
+                "tile01.png","tile02.png","tile03.png",
+                "beach sand 01.png","beach sand 02.png","beach sand 03.png"
             };
             string destinationRoot = "Assets/Metin2/Generated/Maps/Blue1/Textures";
-            foreach (string relative in files)
+            foreach (string name in files)
             {
-                string source = Path.Combine(sourceRoot, relative);
-                string name = Path.GetFileName(relative);
+                string source = Path.Combine(sourceRoot, name);
                 string destination = Path.Combine(Application.dataPath, "Metin2/Generated/Maps/Blue1/Textures", name);
-                if (!File.Exists(source)) throw new Exception("Blue 1 texture bulunamadı: " + source);
+                if (!File.Exists(source))
+                    throw new Exception("Blue 1 PNG bulunamadı: " + source);
                 File.Copy(source, destination, true);
-                string assetPath = "Assets/Metin2/Generated/Maps/Blue1/Textures/" + name;
-                AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
             }
-            AssetDatabase.SaveAssets();
-            Debug.Log("Metin2: Blue 1 için 17 gerçek terrain DDS texture Unity projesine kopyalandı.");
+
+            AssetDatabase.Refresh();
+            Debug.Log("Metin2: Blue 1 için 17 gerçek terrain PNG Unity projesine kopyalandı.");
         }
 
         private static void CreateTerrainChunk(
