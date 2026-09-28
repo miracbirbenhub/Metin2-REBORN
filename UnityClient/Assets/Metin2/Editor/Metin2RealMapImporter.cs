@@ -261,11 +261,9 @@ namespace Metin2Reborn.Editor
             int width = BitConverter.ToInt32(dds, 16);
             int fourCC = BitConverter.ToInt32(dds, 84);
 
-            // Blue 1 minimap.dds is the classic 256x256 DXT1 file:
-            // 128-byte DDS header + 32768-byte BC1/DXT1 payload = 32896 bytes.
             if (width != 256 || height != 256)
                 throw new Exception($"Beklenmeyen minimap boyutu: {width}x{height}");
-            if (fourCC != 0x31545844) // "DXT1"
+            if (fourCC != 0x31545844)
                 throw new Exception($"Blue 1 minimap DDS formatı DXT1 değil. FourCC=0x{fourCC:X8}, size={dds.Length}");
 
             Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false, false);
@@ -298,29 +296,28 @@ namespace Metin2Reborn.Editor
 
             texture.SetPixels32(pixels);
             texture.Apply(false, false);
+            texture.name = "Blue1_Minimap_" + chunkName;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            texture.filterMode = FilterMode.Bilinear;
 
+            // Keep the decoded texture as a native Unity asset. This avoids
+            // the AssetDatabase timing issue where a freshly-written PNG can
+            // return null from LoadAssetAtPath during the same import pass.
             string folder = "Assets/Metin2/Generated/Maps/Blue1/Minimap";
             EnsureFolder(folder);
-            string pngFilePath = Path.Combine(Application.dataPath, "Metin2/Generated/Maps/Blue1/Minimap/minimap_" + chunkName + ".png");
-            string pngAssetPath = folder + "/minimap_" + chunkName + ".png";
-            File.WriteAllBytes(pngFilePath, texture.EncodeToPNG());
-            UnityEngine.Object.DestroyImmediate(texture);
+            string assetPath = folder + "/minimap_" + chunkName + ".asset";
 
-            AssetDatabase.ImportAsset(pngAssetPath, ImportAssetOptions.ForceSynchronousImport);
-            TextureImporter importer = AssetImporter.GetAtPath(pngAssetPath) as TextureImporter;
-            if (importer != null)
-            {
-                importer.textureType = TextureImporterType.Default;
-                importer.sRGBTexture = true;
-                importer.wrapMode = TextureWrapMode.Clamp;
-                importer.filterMode = FilterMode.Bilinear;
-                importer.mipmapEnabled = true;
-                importer.SaveAndReimport();
-            }
+            UnityEngine.Object old = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
+            if (old != null)
+                AssetDatabase.DeleteAsset(assetPath);
 
-            Texture2D imported = AssetDatabase.LoadAssetAtPath<Texture2D>(pngAssetPath);
+            AssetDatabase.CreateAsset(texture, assetPath);
+            AssetDatabase.SaveAssets();
+
+            Texture2D imported = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
             if (imported == null)
-                throw new Exception("minimap PNG Unity texture olarak yüklenemedi: " + pngAssetPath);
+                throw new Exception("Blue 1 minimap Texture2D asset oluşturulamadı: " + assetPath);
+
             return imported;
         }
 
