@@ -1,7 +1,8 @@
 $ErrorActionPreference = "Stop"
-$noesis = "C:\Users\roxy\OneDrive\Masaüstü\shared_3d_exporting\noesis\noesis\Noesis.exe"
-$sourceRoot = "C:\Users\roxy\OneDrive\Masaüstü\Metin2BE-Client-master\objects\ymir work\terrainmaps\b"
-$outputRoot = Join-Path (Split-Path -Parent $sourceRoot) "_BLUE1_PNG"
+$desktop = [Environment]::GetFolderPath("Desktop")
+$noesis = Join-Path $desktop "shared_3d_exporting\noesis\noesis\Noesis.exe"
+$sourceRoot = Join-Path $desktop "Metin2BE-Client-master\objects\ymir work\terrainmaps\b"
+$outputRoot = Join-Path (Join-Path $desktop "Metin2BE-Client-master") "_BLUE1_PNG"
 $files = @(
 "field\field 01.dds","field\field 02.dds","field\field 03.dds","field\field 04.dds",
 "grass\grass 01.dds","grass\grass 02.dds","grass\grass 03.dds",
