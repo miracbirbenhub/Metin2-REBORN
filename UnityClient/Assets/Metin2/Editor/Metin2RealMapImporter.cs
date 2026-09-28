@@ -582,7 +582,9 @@ namespace Metin2Reborn.Editor
             player.transform.localPosition = new Vector3(cityX, 150f, cityZ);
             player.transform.rotation = Quaternion.identity;
 
-            visual.transform.SetParent(player.transform, true);
+            visual.transform.SetParent(player.transform, false);
+            visual.transform.localPosition = Vector3.zero;
+            AlignVisualFeetToPlayer(visual, player);
 
             CharacterController cc = player.AddComponent<CharacterController>();
             cc.height = 1.8f;
@@ -596,6 +598,19 @@ namespace Metin2Reborn.Editor
             player.AddComponent<Metin2Inventory>();
 
             return player;
+        }
+
+        private static void AlignVisualFeetToPlayer(GameObject visual, GameObject player)
+        {
+            Renderer[] renderers = visual.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0) return;
+
+            Bounds bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++)
+                bounds.Encapsulate(renderers[i].bounds);
+
+            float delta = player.transform.position.y - bounds.min.y + 0.03f;
+            visual.transform.position += Vector3.up * delta;
         }
 
         private static void PlacePlayerOnTerrain(GameObject player, Transform mapRoot, float localX, float localZ)
