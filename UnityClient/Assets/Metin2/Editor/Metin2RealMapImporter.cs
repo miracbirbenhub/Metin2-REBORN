@@ -573,7 +573,9 @@ namespace Metin2Reborn.Editor
 
             // The terrain is normalized to start at local Y=0, so a small
             // positive spawn height places the player above the ground.
-            player.transform.localPosition = new Vector3(0f, 8f, 0f);
+            float totalWidth = ChunkColumns * 128f * CellScale * WorldScale;
+            float totalDepth = ChunkRows * 128f * CellScale * WorldScale;
+            player.transform.localPosition = new Vector3(totalWidth * 0.5f, 8f, totalDepth * 0.5f);
             player.transform.rotation = Quaternion.identity;
 
             visual.transform.SetParent(player.transform, true);
@@ -600,7 +602,7 @@ namespace Metin2Reborn.Editor
             camera.fieldOfView = 55f;
             camera.nearClipPlane = 0.03f;
             camera.farClipPlane = 2000f;
-            cameraObject.transform.position = player.transform.position + new Vector3(0f, 5.2f, -7.5f);
+            cameraObject.transform.position = player.transform.position + new Vector3(0f, 3.8f, -5.5f);
             cameraObject.transform.LookAt(player.transform.position + Vector3.up);
 
             Metin2FollowCamera follow = cameraObject.AddComponent<Metin2FollowCamera>();
