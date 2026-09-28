@@ -577,8 +577,8 @@ namespace Metin2Reborn.Editor
             float totalDepth = ChunkRows * 128f * CellScale * WorldScale;
             // Joan city center / City Guard area. The classic Joan map places the city around
             // (571, 558); our imported Blue 1 world uses the same local coordinate scale.
-            float cityX = 571f;
-            float cityZ = 558f;
+            float cityX = 512f;
+            float cityZ = 384f;
             player.transform.localPosition = new Vector3(cityX, 150f, cityZ);
             player.transform.rotation = Quaternion.identity;
 
