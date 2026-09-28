@@ -312,20 +312,11 @@ namespace Metin2Reborn.Editor
             // Blue 1 uses the URP Terrain Lit shader. Do not tint the
             // terrain with a generic material color: that was masking the
             // imported splat textures and made the whole map brown.
-            Shader terrainShader = Shader.Find("Universal Render Pipeline/Terrain/Lit");
-            if (terrainShader != null)
-            {
-                Material material = new Material(terrainShader);
-                material.name = "Blue1_Terrain_" + chunkName + "_Material";
-                material.color = Color.white;
-                terrain.materialType = Terrain.MaterialType.Custom;
-                terrain.materialTemplate = material;
-            }
-            else
-            {
-                terrain.materialType = Terrain.MaterialType.BuiltInStandard;
-                terrain.materialTemplate = null;
-            }
+            // Let the active render pipeline use its native Terrain material.
+            // Do not assign a custom material here; Terrain Layers are rendered
+            // from TerrainData's splat weights by the pipeline's terrain shader.
+            terrain.materialType = Terrain.MaterialType.BuiltInStandard;
+            terrain.materialTemplate = null;
         }
 
         private static GameObject BuildPlayer(Transform mapRoot)
