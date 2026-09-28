@@ -462,10 +462,34 @@ namespace Metin2Reborn.Editor
 
             data.SetHeights(0, 0, heights);
 
-            // Use the real Metin2 tile.raw texture index map instead of the
-            // minimap image. tile.raw is the terrain's 256x256 half-cell texture
-            // index grid (stored as 258x258 with a one-cell border).
-            ApplyBlue1TextureSplat(data, Path.Combine(chunkPath, "tile.raw"));
+            // IMPORTANT: tile.raw is loaded by the original client through
+            // CTerrain::LoadSplatFile, but its byte-to-texture interpretation is
+            // not documented reliably. Directly treating its bytes as TextureSet
+            // IDs produced large brown regions. Keep the proven 256x256 minimap
+            // as the terrain diffuse until the splat format is decoded exactly.
+            // The real height.raw remains active, so this is still fully walkable
+            // terrain rather than a flat minimap.
+            Texture2D minimap = ImportBlue1MinimapTexture(chunkName, chunkPath);
+            TerrainLayer minimapLayer = new TerrainLayer
+            {
+                diffuseTexture = minimap,
+                tileSize = new Vector2(chunkSize, chunkSize),
+                tileOffset = Vector2.zero
+            };
+            string layerAssetPath = DataRoot + "/TerrainLayers/Blue1_Minimap_" + chunkName + ".terrainlayer";
+            TerrainLayer existingLayer = AssetDatabase.LoadAssetAtPath<TerrainLayer>(layerAssetPath);
+            if (existingLayer == null)
+            {
+                AssetDatabase.CreateAsset(minimapLayer, layerAssetPath);
+            }
+            else
+            {
+                existingLayer.diffuseTexture = minimap;
+                existingLayer.tileSize = new Vector2(chunkSize, chunkSize);
+                EditorUtility.SetDirty(existingLayer);
+                minimapLayer = existingLayer;
+            }
+            data.terrainLayers = new[] { minimapLayer };
 
             string assetPath = DataRoot + "/Terrain_" + chunkName + ".asset";
             AssetDatabase.CreateAsset(data, assetPath);
