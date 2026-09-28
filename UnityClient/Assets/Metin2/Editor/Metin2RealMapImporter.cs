@@ -36,12 +36,14 @@ namespace Metin2Reborn.Editor
             EnsureFolder("Assets/Metin2/Generated");
             EnsureFolder("Assets/Metin2/Generated/Maps");
             EnsureFolder(DataRoot);
+            EnsureFolder("Assets/Metin2/Generated/Maps/Blue1/Textures");
 
             AssetDatabase.StartAssetEditing();
             try
             {
                 Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
                 BuildLighting();
+                ImportBlue1Textures();
 
                 float chunkSize = 128f * CellScale * WorldScale;
                 float totalWidth = ChunkColumns * chunkSize;
@@ -94,6 +96,30 @@ namespace Metin2Reborn.Editor
             light.intensity = 1.1f;
             sun.transform.rotation = Quaternion.Euler(50f, -35f, 0f);
             RenderSettings.ambientIntensity = 1f;
+        }
+
+        private static void ImportBlue1Textures()
+        {
+            string sourceRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Metin2BE-Client-master\\objects\\ymir work\\terrainmaps\\b");
+            string[] files =
+            {
+                "field\\field 01.dds","field\\field 02.dds","field\\field 03.dds","field\\field 04.dds",
+                "grass\\grass 01.dds","grass\\grass 02.dds","grass\\grass 03.dds",
+                "stone\\stone01.dds","stone\\stone02.dds","stone\\stone03.dds","stone\\stone04.dds",
+                "tile\\tile01.dds","tile\\tile02.dds","tile\\tile03.dds",
+                "beach\\beach sand 01.dds","beach\\beach sand 02.dds","beach\\beach sand 03.dds"
+            };
+            string destinationRoot = "Assets/Metin2/Generated/Maps/Blue1/Textures";
+            foreach (string relative in files)
+            {
+                string source = Path.Combine(sourceRoot, relative);
+                string name = Path.GetFileName(relative);
+                string destination = Path.Combine(Application.dataPath, "Metin2/Generated/Maps/Blue1/Textures", name);
+                if (!File.Exists(source)) throw new Exception("Blue 1 texture bulunamadı: " + source);
+                File.Copy(source, destination, true);
+            }
+            AssetDatabase.Refresh();
+            Debug.Log("Metin2: Blue 1 için 17 gerçek terrain DDS texture Unity projesine kopyalandı.");
         }
 
         private static void CreateTerrainChunk(
