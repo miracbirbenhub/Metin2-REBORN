@@ -133,51 +133,48 @@ if ($ConvertNow) {
     $noesis = Join-Path $desktop "shared_3d_exporting\noesis\noesis\Noesis.exe"
     if (-not (Test-Path -LiteralPath $noesis)) { throw "Noesis.exe bulunamadi: $noesis" }
 
-    # Noesis'in Python katmani Turkce/Unicode klasor yolundaki 0xFC karakterinde
-    # UTF-8 hatasi verebildigi durumlar icin SourceRoot'u ASCII bir surucu harfine map et.
-    $drive = "M:"
-    & subst $drive $SourceRoot 2>$null
-    if ($LASTEXITCODE -ne 0) { throw "M: surucu harfi kullanilamadi." }
+    $tempRoot = "C:\M2Blue1_Noesis"
+    $tempIn = Join-Path $tempRoot "GR2"
+    $tempOut = Join-Path $tempRoot "FBX"
+    Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Force -Path $tempIn,$tempOut | Out-Null
 
-    try {
-        Write-Host ""
-        Write-Host "NOESIS: $noesis" -ForegroundColor Cyan
-        Write-Host "ASCII path mapping: $drive -> $SourceRoot" -ForegroundColor Cyan
-        Write-Host "Gerekli GR2 modeller FBX'e cevriliyor..." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "NOESIS: $noesis" -ForegroundColor Cyan
+    Write-Host "Unicode yolu tamamen devre disi birakiliyor: $tempRoot" -ForegroundColor Cyan
+    Write-Host "Gerekli GR2 modeller gecici ASCII klasore kopyalaniyor..." -ForegroundColor Yellow
 
-        $done = 0
-        $failed = 0
+    $jobs = @()
+    foreach ($line in $commandLines) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        $parts = $line -split '" "'
+        if ($parts.Count -ne 2) { continue }
+        $source = $parts[0].TrimStart('"')
+        $out = $parts[1].TrimEnd('"')
+        $name = [System.IO.Path]::GetFileNameWithoutExtension($source)
+        $asciiSource = Join-Path $tempIn ($name + ".gr2")
+        $asciiOut = Join-Path $tempOut ($name + ".fbx")
+        Copy-Item -LiteralPath $source -Destination $asciiSource -Force
+        $jobs += [pscustomobject]@{ Source=$source; Out=$out; AsciiSource=$asciiSource; AsciiOut=$asciiOut }
+    }
 
-        foreach ($line in $commandLines) {
-            if ([string]::IsNullOrWhiteSpace($line)) { continue }
-
-            $parts = $line -split '" "'
-            if ($parts.Count -ne 2) { $failed++; continue }
-
-            $source = $parts[0].TrimStart('"')
-            $out = $parts[1].TrimEnd('"')
-
-            $relativeSource = $source.Substring($SourceRoot.Length).TrimStart('')
-            $relativeOut = $out.Substring($ExportRoot.Length).TrimStart('')
-            $asciiSource = Join-Path $drive $relativeSource
-            $asciiOut = Join-Path $drive (Join-Path (Split-Path $ExportRoot -Leaf) $relativeOut)
-
-            & $noesis "?cmode" $asciiSource $asciiOut
-
-            if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $out)) {
-                $done++
-            } else {
-                $failed++
-                Write-Warning "Noesis donusum hatasi: $source"
-            }
+    $done = 0
+    $failed = 0
+    foreach ($job in $jobs) {
+        & $noesis "?cmode" $job.AsciiSource $job.AsciiOut
+        if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $job.AsciiOut)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $job.Out -Parent) | Out-Null
+            Copy-Item -LiteralPath $job.AsciiOut -Destination $job.Out -Force
+            $done++
+        } else {
+            $failed++
+            Write-Warning "Noesis donusum hatasi: $($job.Source)"
         }
+    }
 
-        Write-Host "FBX basarili : $done" -ForegroundColor Green
-        Write-Host "FBX hatali   : $failed" -ForegroundColor Red
-    }
-    finally {
-        & subst $drive /D 2>$null
-    }
+    Write-Host "FBX basarili : $done" -ForegroundColor Green
+    Write-Host "FBX hatali   : $failed" -ForegroundColor Red
+    Write-Host "Gecici klasor: $tempRoot"
 }
 
 Write-Host "AreaData property ID : $($usedIds.Count)"
