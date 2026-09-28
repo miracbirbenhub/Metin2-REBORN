@@ -575,7 +575,11 @@ namespace Metin2Reborn.Editor
             // positive spawn height places the player above the ground.
             float totalWidth = ChunkColumns * 128f * CellScale * WorldScale;
             float totalDepth = ChunkRows * 128f * CellScale * WorldScale;
-            // Joan city center / City Guard area. The classic Joan map places the city around\n            // (571, 558); our imported Blue 1 world uses the same local coordinate scale.\n            float cityX = 571f;\n            float cityZ = 558f;\n            player.transform.localPosition = new Vector3(cityX, 150f, cityZ);
+            // Joan city center / City Guard area. The classic Joan map places the city around
+            // (571, 558); our imported Blue 1 world uses the same local coordinate scale.
+            float cityX = 571f;
+            float cityZ = 558f;
+            player.transform.localPosition = new Vector3(cityX, 150f, cityZ);
             player.transform.rotation = Quaternion.identity;
 
             visual.transform.SetParent(player.transform, true);
@@ -594,7 +598,51 @@ namespace Metin2Reborn.Editor
             return player;
         }
 
-        private static void PlacePlayerOnTerrain(GameObject player, Transform mapRoot, float localX, float localZ)\n        {\n            Terrain[] terrains = UnityEngine.Object.FindObjectsOfType<Terrain>();\n            Vector3 worldPoint = mapRoot.TransformPoint(new Vector3(localX, 0f, localZ));\n            Terrain best = null;\n            float bestDistance = float.MaxValue;\n\n            foreach (Terrain terrain in terrains)\n            {\n                if (terrain == null || terrain.terrainData == null) continue;\n                Vector3 p = terrain.GetPosition();\n                Vector3 size = terrain.terrainData.size;\n                if (worldPoint.x >= p.x && worldPoint.x <= p.x + size.x &&\n                    worldPoint.z >= p.z && worldPoint.z <= p.z + size.z)\n                {\n                    best = terrain;\n                    break;\n                }\n\n                float distance = Vector2.Distance(\n                    new Vector2(worldPoint.x, worldPoint.z),\n                    new Vector2(p.x + size.x * 0.5f, p.z + size.z * 0.5f));\n                if (distance < bestDistance)\n                {\n                    bestDistance = distance;\n                    best = terrain;\n                }\n            }\n\n            if (best != null)\n            {\n                float terrainY = best.SampleHeight(worldPoint) + best.GetPosition().y;\n                Vector3 local = player.transform.localPosition;\n                local.y = terrainY - mapRoot.position.y + 2.0f;\n                player.transform.localPosition = local;\n            }\n            else\n            {\n                Vector3 local = player.transform.localPosition;\n                local.y = 150f;\n                player.transform.localPosition = local;\n            }\n        }\n\n        private static void BuildCamera(GameObject player)
+        private static void PlacePlayerOnTerrain(GameObject player, Transform mapRoot, float localX, float localZ)
+        {
+            Terrain[] terrains = UnityEngine.Object.FindObjectsOfType<Terrain>();
+            Vector3 worldPoint = mapRoot.TransformPoint(new Vector3(localX, 0f, localZ));
+            Terrain best = null;
+            float bestDistance = float.MaxValue;
+
+            foreach (Terrain terrain in terrains)
+            {
+                if (terrain == null || terrain.terrainData == null) continue;
+                Vector3 p = terrain.GetPosition();
+                Vector3 size = terrain.terrainData.size;
+                if (worldPoint.x >= p.x && worldPoint.x <= p.x + size.x &&
+                    worldPoint.z >= p.z && worldPoint.z <= p.z + size.z)
+                {
+                    best = terrain;
+                    break;
+                }
+
+                float distance = Vector2.Distance(
+                    new Vector2(worldPoint.x, worldPoint.z),
+                    new Vector2(p.x + size.x * 0.5f, p.z + size.z * 0.5f));
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    best = terrain;
+                }
+            }
+
+            if (best != null)
+            {
+                float terrainY = best.SampleHeight(worldPoint) + best.GetPosition().y;
+                Vector3 local = player.transform.localPosition;
+                local.y = terrainY - mapRoot.position.y + 2.0f;
+                player.transform.localPosition = local;
+            }
+            else
+            {
+                Vector3 local = player.transform.localPosition;
+                local.y = 150f;
+                player.transform.localPosition = local;
+            }
+        }
+
+        private static void BuildCamera(GameObject player)
         {
             GameObject cameraObject = new GameObject("Main Camera");
             cameraObject.tag = "MainCamera";
