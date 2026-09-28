@@ -539,10 +539,23 @@ namespace Metin2Reborn.Editor
                         // Y is the north/south axis stored as negative values.
                         // Our Unity map is centered around (0,0), so convert the
                         // source coordinates into the same meter convention.
+                        // Blue 1 source coordinates are absolute map coordinates in
+                        // centimeters. The imported terrain is normalized so its lower-left
+                        // corner is Unity (0,0,0). Blue 1 is 5 x 4 chunks = 1280 x 1024
+                        // cells/meters after the 0.01 scale, so the map center is:
+                        // X = 640m, Z = 512m. Source Y is the north/south axis and is negative.
                         float worldX = data.Position.x * WorldScale;
                         float worldZ = -data.Position.y * WorldScale;
-                        float localX = worldX - (ChunkColumns * chunkSize * 0.5f);
-                        float localZ = worldZ - (ChunkRows * chunkSize * 0.5f);
+                        float totalMapWidth = ChunkColumns * chunkSize;
+                        float totalMapDepth = ChunkRows * chunkSize;
+                        float localX = worldX;
+                        float localZ = worldZ;
+
+                        // mapRoot is currently kept at the terrain's lower-left origin.
+                        // Do NOT subtract 640/512 here: those values would shift every
+                        // source object away from the corresponding terrain chunk.
+                        localX = Mathf.Clamp(localX, -chunkSize, totalMapWidth + chunkSize);
+                        localZ = Mathf.Clamp(localZ, -chunkSize, totalMapDepth + chunkSize);
 
                         instance.transform.localPosition = new Vector3(localX, 0f, localZ);
                         instance.transform.localRotation = Quaternion.Euler(
@@ -701,7 +714,11 @@ namespace Metin2Reborn.Editor
 
         private static void PlaceObjectOnTerrain(GameObject instance, float localX, float localZ, float heightOffset)
         {
-            Vector3 world = instance.transform.parent.parent.TransformPoint(new Vector3(localX, 0f, localZ));
+            Transform mapRoot = instance.transform.parent.parent;
+
+            // Objects are now placed in the same lower-left-origin coordinate
+            // system as the Terrain chunks.
+            Vector3 world = mapRoot.TransformPoint(new Vector3(localX, 0f, localZ));
             Terrain best = null;
             foreach (Terrain terrain in UnityEngine.Object.FindObjectsOfType<Terrain>())
             {
