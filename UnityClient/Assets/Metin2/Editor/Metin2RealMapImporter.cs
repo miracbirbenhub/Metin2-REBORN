@@ -558,10 +558,17 @@ namespace Metin2Reborn.Editor
                         localZ = Mathf.Clamp(localZ, -chunkSize, totalMapDepth + chunkSize);
 
                         instance.transform.localPosition = new Vector3(localX, 0f, localZ);
-                        instance.transform.localRotation = Quaternion.Euler(
+
+                        // Noesis converts the GR2 geometry, but many original Metin2
+                        // building models carry the same axis convention that initially
+                        // made the Warrior appear on its head. Correct the model's local
+                        // up-axis first, then apply the AreaData's original map rotation.
+                        Quaternion modelCorrection = FindBestStandingRotation(instance);
+                        Quaternion sourceRotation = Quaternion.Euler(
                             data.Rotation.x,
                             data.Rotation.y,
                             data.Rotation.z);
+                        instance.transform.localRotation = sourceRotation * modelCorrection;
 
                         Vector3 scale = instance.transform.localScale;
                         float maxAxis = Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z));
