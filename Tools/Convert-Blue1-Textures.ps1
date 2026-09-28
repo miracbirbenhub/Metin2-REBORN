@@ -40,7 +40,7 @@ foreach ($file in $dds) {
     $outFile = Join-Path $tempOut ($name + ".png")
     Copy-Item -LiteralPath $file.FullName -Destination $inFile -Force
 
-    & $noesis "?cmode" $inFile $outFile 2>&1 | Out-Null
+    cmd /c ""$noesis" "?cmode" "$inFile" "$outFile" 2>nul" | Out-Null
 
     if (Test-Path -LiteralPath $outFile) {
         Copy-Item -LiteralPath $outFile -Destination (Join-Path $TextureRoot ($name + ".png")) -Force
