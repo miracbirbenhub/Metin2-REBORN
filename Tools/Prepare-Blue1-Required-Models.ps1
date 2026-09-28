@@ -132,22 +132,52 @@ if ($ConvertNow) {
     $desktop = [Environment]::GetFolderPath("Desktop")
     $noesis = Join-Path $desktop "shared_3d_exporting\noesis\noesis\Noesis.exe"
     if (-not (Test-Path -LiteralPath $noesis)) { throw "Noesis.exe bulunamadi: $noesis" }
-    Write-Host ""
-    Write-Host "NOESIS: $noesis" -ForegroundColor Cyan
-    Write-Host "Gerekli GR2 modeller FBX'e cevriliyor..." -ForegroundColor Yellow
-    $done = 0
-    $failed = 0
-    foreach ($line in $commandLines) {
-        if ([string]::IsNullOrWhiteSpace($line)) { continue }
-        $parts = $line -split '" "'
-        if ($parts.Count -ne 2) { $failed++; continue }
-        $source = $parts[0].TrimStart('"')
-        $out = $parts[1].TrimEnd('"')
-        & $noesis "?cmode" $source $out
-        if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $out)) { $done++ } else { $failed++; Write-Warning "Noesis donusum hatasi: $source" }
+
+    # Noesis'in Python katmani Turkce/Unicode klasor yolundaki 0xFC karakterinde
+    # UTF-8 hatasi verebildigi durumlar icin SourceRoot'u ASCII bir surucu harfine map et.
+    $drive = "M:"
+    & subst $drive $SourceRoot 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "M: surucu harfi kullanilamadi." }
+
+    try {
+        Write-Host ""
+        Write-Host "NOESIS: $noesis" -ForegroundColor Cyan
+        Write-Host "ASCII path mapping: $drive -> $SourceRoot" -ForegroundColor Cyan
+        Write-Host "Gerekli GR2 modeller FBX'e cevriliyor..." -ForegroundColor Yellow
+
+        $done = 0
+        $failed = 0
+
+        foreach ($line in $commandLines) {
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+
+            $parts = $line -split '" "'
+            if ($parts.Count -ne 2) { $failed++; continue }
+
+            $source = $parts[0].TrimStart('"')
+            $out = $parts[1].TrimEnd('"')
+
+            $relativeSource = $source.Substring($SourceRoot.Length).TrimStart('')
+            $relativeOut = $out.Substring($ExportRoot.Length).TrimStart('')
+            $asciiSource = Join-Path $drive $relativeSource
+            $asciiOut = Join-Path $drive (Join-Path (Split-Path $ExportRoot -Leaf) $relativeOut)
+
+            & $noesis "?cmode" $asciiSource $asciiOut
+
+            if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $out)) {
+                $done++
+            } else {
+                $failed++
+                Write-Warning "Noesis donusum hatasi: $source"
+            }
+        }
+
+        Write-Host "FBX basarili : $done" -ForegroundColor Green
+        Write-Host "FBX hatali   : $failed" -ForegroundColor Red
     }
-    Write-Host "FBX basarili : $done" -ForegroundColor Green
-    Write-Host "FBX hatali   : $failed" -ForegroundColor Red
+    finally {
+        & subst $drive /D 2>$null
+    }
 }
 
 Write-Host "AreaData property ID : $($usedIds.Count)"
