@@ -41,12 +41,16 @@ namespace Metin2Reborn.Editor
             EnsureFolder(DataRoot);
             EnsureFolder("Assets/Metin2/Generated/Maps/Blue1/Textures");
 
+            // Import the PNG files before StartAssetEditing so Unity creates
+            // usable Texture2D assets before TerrainLayer creation and splat setup.
+            ImportBlue1Textures();
+            CreateBlue1TerrainLayers();
+
             AssetDatabase.StartAssetEditing();
             try
             {
                 Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
                 BuildLighting();
-                ImportBlue1Textures();
 
                 float chunkSize = 128f * CellScale * WorldScale;
                 float totalWidth = ChunkColumns * chunkSize;
@@ -75,8 +79,6 @@ namespace Metin2Reborn.Editor
 
                 EditorSceneManager.SaveScene(scene, ScenePath);
                 AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
-                CreateBlue1TerrainLayers();
 
                 // Open the generated scene immediately so the imported map is visible.
                 EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
@@ -220,7 +222,24 @@ namespace Metin2Reborn.Editor
             }
 
             AssetDatabase.Refresh();
-            Debug.Log("Metin2: Blue 1 için 17 gerçek terrain PNG Unity projesine kopyalandı.");
+
+            string[] importedFiles =
+            {
+                "field 01.png","field 02.png","field 03.png","field 04.png",
+                "grass 01.png","grass 02.png","grass 03.png",
+                "stone01.png","stone02.png","stone03.png","stone04.png",
+                "tile01.png","tile02.png","tile03.png",
+                "beach sand 01.png","beach sand 02.png","beach sand 03.png"
+            };
+
+            foreach (string name in importedFiles)
+            {
+                string assetPath = destinationRoot + "/" + name;
+                AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport);
+            }
+
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+            Debug.Log("Metin2: Blue 1 için 17 gerçek terrain PNG Unity projesine kopyalandı ve senkron import edildi.");
         }
 
         private static void CreateTerrainChunk(
