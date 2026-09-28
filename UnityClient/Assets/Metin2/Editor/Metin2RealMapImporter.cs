@@ -151,6 +151,33 @@ namespace Metin2Reborn.Editor
             Debug.Log("Metin2: Blue 1 için 17 TerrainLayer oluşturuldu.");
         }
 
+        private static void ApplyBlue1MinimapTerrain(TerrainData data, string chunkName, string chunkPath)
+        {
+            Texture2D minimap = ImportBlue1MinimapTexture(chunkName, chunkPath);
+            string layerPath = DataRoot + "/TerrainLayers/Blue1_Minimap_" + chunkName + ".terrainlayer";
+            TerrainLayer layer = AssetDatabase.LoadAssetAtPath<TerrainLayer>(layerPath);
+
+            if (layer == null)
+            {
+                layer = new TerrainLayer();
+                AssetDatabase.CreateAsset(layer, layerPath);
+            }
+
+            layer.diffuseTexture = minimap;
+            layer.tileSize = new Vector2(256f, 256f);
+            layer.tileOffset = Vector2.zero;
+            EditorUtility.SetDirty(layer);
+
+            data.terrainLayers = new[] { layer };
+
+            float[,,] alpha = new float[SplatResolution, SplatResolution, 1];
+            for (int y = 0; y < SplatResolution; y++)
+                for (int x = 0; x < SplatResolution; x++)
+                    alpha[y, x, 0] = 1f;
+
+            data.SetAlphamaps(0, 0, alpha);
+        }
+
         private static void ApplyBlue1TextureSplat(TerrainData data, string tilePath)
         {
             if (!File.Exists(tilePath))
@@ -253,6 +280,10 @@ namespace Metin2Reborn.Editor
             light.intensity = 1.1f;
             sun.transform.rotation = Quaternion.Euler(50f, -35f, 0f);
             RenderSettings.ambientIntensity = 1f;
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
+            RenderSettings.fogDensity = 0.0038f;
+            RenderSettings.fogColor = new Color(0.63f, 0.70f, 0.78f, 1f);
         }
 
         private static void ImportBlue1Textures()
@@ -478,10 +509,11 @@ namespace Metin2Reborn.Editor
 
             data.SetHeights(0, 0, heights);
 
-            // Use the real Blue 1 tile.raw splat map for the ground. The
-            // minimap remains available as a diagnostic asset but is not used
-            // as the 3D terrain diffuse.
-            ApplyBlue1TextureSplat(data, Path.Combine(chunkPath, "tile.raw"));
+            // Until the original client's proprietary tile.raw splat decoding is
+            // reproduced exactly, use the real 256x256 Blue 1 minimap as the terrain
+            // color map. This keeps roads, fields, water and the village layout in
+            // the correct places instead of collapsing the whole ground to one color.
+            ApplyBlue1MinimapTerrain(data, chunkName, chunkPath);
 
             string assetPath = DataRoot + "/Terrain_" + chunkName + ".asset";
             AssetDatabase.CreateAsset(data, assetPath);
@@ -500,7 +532,7 @@ namespace Metin2Reborn.Editor
             Terrain terrain = terrainObject.GetComponent<Terrain>();
             terrain.drawInstanced = true;
             terrain.heightmapPixelError = 3f;
-            terrain.basemapDistance = 2000f;
+            terrain.basemapDistance = 220f;
             // Blue 1 uses the URP Terrain Lit shader. Do not tint the
             // terrain with a generic material color: that was masking the
             // imported splat textures and made the whole map brown.
@@ -924,12 +956,14 @@ namespace Metin2Reborn.Editor
             GameObject cameraObject = new GameObject("Main Camera");
             cameraObject.tag = "MainCamera";
             Camera camera = cameraObject.AddComponent<Camera>();
-            camera.fieldOfView = 55f;
+            camera.fieldOfView = 50f;
             camera.nearClipPlane = 0.03f;
-            camera.farClipPlane = 2000f;
+            camera.farClipPlane = 260f;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.63f, 0.70f, 0.78f, 1f);
             // Start close to the exact center of Terrain001002 so the source
             // object placement can be checked without navigating the whole map.
-            cameraObject.transform.position = player.transform.position + new Vector3(0f, 8.0f, -12.0f);
+            cameraObject.transform.position = player.transform.position + new Vector3(0f, 6.2f, -8.5f);
             cameraObject.transform.LookAt(player.transform.position + Vector3.up * 1.1f);
 
             Metin2FollowCamera follow = cameraObject.AddComponent<Metin2FollowCamera>();
