@@ -84,6 +84,16 @@ namespace Metin2Reborn.Editor
             }
         }
 
+        private static void BuildLighting()
+        {
+            GameObject sun = new GameObject("Sun");
+            Light light = sun.AddComponent<Light>();
+            light.type = LightType.Directional;
+            light.intensity = 1.1f;
+            sun.transform.rotation = Quaternion.Euler(50f, -35f, 0f);
+            RenderSettings.ambientIntensity = 1f;
+        }
+
         private static void CreateTerrainChunk(
             Transform parent,
             string chunkName,
