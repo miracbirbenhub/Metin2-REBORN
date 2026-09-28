@@ -102,11 +102,11 @@ namespace Metin2Reborn.Editor
 
             string[] files =
             {
-                "field 01.dds", "field 02.dds", "field 03.dds", "field 04.dds",
-                "grass 01.dds", "grass 02.dds", "grass 03.dds",
-                "stone01.dds", "stone02.dds", "stone03.dds", "stone04.dds",
-                "tile01.dds", "tile02.dds", "tile03.dds",
-                "beach sand 01.dds", "beach sand 02.dds", "beach sand 03.dds"
+                "field 01.png", "field 02.png", "field 03.png", "field 04.png",
+                "grass 01.png", "grass 02.png", "grass 03.png",
+                "stone01.png", "stone02.png", "stone03.png", "stone04.png",
+                "tile01.png", "tile02.png", "tile03.png",
+                "beach sand 01.png", "beach sand 02.png", "beach sand 03.png"
             };
 
             for (int i = 0; i < TerrainTextureCount; i++)
@@ -203,7 +203,7 @@ namespace Metin2Reborn.Editor
             string sourceRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Metin2BE-Client-master\\objects\\ymir work\\terrainmaps\\b");
             string[] files =
             {
-                "field\\field 01.dds","field\\field 02.dds","field\\field 03.dds","field\\field 04.dds",
+                "field\\field 01.png","field\\field 02.dds","field\\field 03.dds","field\\field 04.dds",
                 "grass\\grass 01.dds","grass\\grass 02.dds","grass\\grass 03.dds",
                 "stone\\stone01.dds","stone\\stone02.dds","stone\\stone03.dds","stone\\stone04.dds",
                 "tile\\tile01.dds","tile\\tile02.dds","tile\\tile03.dds",
