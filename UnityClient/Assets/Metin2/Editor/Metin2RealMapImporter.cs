@@ -247,75 +247,37 @@ namespace Metin2Reborn.Editor
             Debug.Log("Metin2: Blue 1 için 17 gerçek terrain PNG Unity projesine kopyalandı ve senkron import edildi.");
         }
 
-        private static Texture2D BuildBlue1CompositeTexture(string tilePath)
+        private static Texture2D ImportBlue1MinimapTexture(string chunkName, string chunkPath)
         {
-            string assetPath = "Assets/Metin2/Generated/Maps/Blue1/Textures/Blue1_Composite.png";
-            string diskPath = Path.Combine(Application.dataPath, "Metin2/Generated/Maps/Blue1/Textures/Blue1_Composite.png");
+            string source = Path.Combine(chunkPath, "minimap.dds");
+            if (!File.Exists(source))
+                throw new Exception("minimap.dds bulunamadı: " + source);
 
-            byte[] tileBytes = File.ReadAllBytes(tilePath);
-            if (tileBytes.Length != TileRawResolution * TileRawResolution)
-                throw new Exception("tile.raw beklenmeyen boyutta: " + tileBytes.Length);
+            string folder = "Assets/Metin2/Generated/Maps/Blue1/Minimap";
+            EnsureFolder(folder);
 
-            string[] names =
-            {
-                "field 01.png","field 02.png","field 03.png","field 04.png",
-                "grass 01.png","grass 02.png","grass 03.png",
-                "stone01.png","stone02.png","stone03.png","stone04.png",
-                "tile01.png","tile02.png","tile03.png",
-                "beach sand 01.png","beach sand 02.png","beach sand 03.png"
-            };
+            string fileName = "minimap_" + chunkName + ".dds";
+            string destination = Path.Combine(Application.dataPath, "Metin2/Generated/Maps/Blue1/Minimap", fileName);
+            File.Copy(source, destination, true);
 
-            Texture2D[] sources = new Texture2D[TerrainTextureCount];
-            for (int i = 0; i < TerrainTextureCount; i++)
-            {
-                string p = "Assets/Metin2/Generated/Maps/Blue1/Textures/" + names[i];
-                sources[i] = AssetDatabase.LoadAssetAtPath<Texture2D>(p);
-                if (sources[i] == null)
-                    throw new Exception("Composite texture bulunamadı: " + p);
-            }
-
-            const int size = 512;
-            Texture2D composite = new Texture2D(size, size, TextureFormat.RGB24, false, false);
-            Color[] pixels = new Color[size * size];
-
-            for (int y = 0; y < size; y++)
-            {
-                int mapY = Mathf.Clamp(1 + Mathf.FloorToInt((float)y / size * 256f), 1, 256);
-                int sourceY = TileRawResolution - 1 - mapY;
-
-                for (int x = 0; x < size; x++)
-                {
-                    int mapX = Mathf.Clamp(1 + Mathf.FloorToInt((float)x / size * 256f), 1, 256);
-                    byte raw = tileBytes[sourceY * TileRawResolution + mapX];
-                    int textureIndex = Mathf.Clamp(raw == 0 ? 0 : raw - 1, 0, TerrainTextureCount - 1);
-
-                    Texture2D source = sources[textureIndex];
-                    int sx = Mathf.Clamp(Mathf.FloorToInt((float)x / size * source.width), 0, source.width - 1);
-                    int sy = Mathf.Clamp(Mathf.FloorToInt((float)y / size * source.height), 0, source.height - 1);
-
-                    pixels[y * size + x] = source.GetPixel(sx, sy);
-                }
-            }
-
-            composite.SetPixels(pixels);
-            composite.Apply(false, false);
-            byte[] png = composite.EncodeToPNG();
-            File.WriteAllBytes(diskPath, png);
-            UnityEngine.Object.DestroyImmediate(composite);
-
+            string assetPath = folder + "/" + fileName;
             AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport);
+
             TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
             if (importer != null)
             {
                 importer.textureType = TextureImporterType.Default;
-                importer.wrapMode = TextureWrapMode.Repeat;
+                importer.wrapMode = TextureWrapMode.Clamp;
                 importer.filterMode = FilterMode.Bilinear;
                 importer.mipmapEnabled = true;
-                importer.isReadable = false;
                 importer.SaveAndReimport();
             }
 
-            return AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
+            if (texture == null)
+                throw new Exception("minimap.dds Unity texture olarak yüklenemedi: " + assetPath);
+
+            return texture;
         }
 
         private static void CreateTerrainChunk(
@@ -375,16 +337,20 @@ namespace Metin2Reborn.Editor
 
             data.SetHeights(0, 0, heights);
 
-            Texture2D composite = BuildBlue1CompositeTexture(Path.Combine(chunkPath, "tile.raw"));
-            TerrainLayer compositeLayer = new TerrainLayer
+            // Use the original Metin2 minimap tile as the ground diffuse.
+            // minimap.dds is a 256x256 visual representation of each sectree,
+            // so this gives us an exact visual reference while we finish the
+            // proprietary tile.raw splat interpretation.
+            Texture2D minimap = ImportBlue1MinimapTexture(chunkName, chunkPath);
+            TerrainLayer minimapLayer = new TerrainLayer
             {
-                diffuseTexture = composite,
+                diffuseTexture = minimap,
                 tileSize = new Vector2(chunkSize, chunkSize),
                 tileOffset = Vector2.zero
             };
-            string layerAssetPath = DataRoot + "/TerrainLayers/Blue1_Composite_" + chunkName + ".terrainlayer";
-            AssetDatabase.CreateAsset(compositeLayer, layerAssetPath);
-            data.terrainLayers = new[] { compositeLayer };
+            string layerAssetPath = DataRoot + "/TerrainLayers/Blue1_Minimap_" + chunkName + ".terrainlayer";
+            AssetDatabase.CreateAsset(minimapLayer, layerAssetPath);
+            data.terrainLayers = new[] { minimapLayer };
 
             string assetPath = DataRoot + "/Terrain_" + chunkName + ".asset";
             AssetDatabase.CreateAsset(data, assetPath);
