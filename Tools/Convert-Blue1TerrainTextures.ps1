@@ -16,7 +16,7 @@ foreach ($rel in $files) {
   $name = [IO.Path]::GetFileNameWithoutExtension($rel) + ".png"
   $output = Join-Path $outputRoot $name
   if (!(Test-Path $input)) { throw "DDS bulunamadi: $input" }
-  & $noesis "?cmode" $input $output "-imgoutex" ".png"
+  & $noesis "?cmode" $input $output
   if ($LASTEXITCODE -ne 0 -or !(Test-Path $output)) { throw "Noesis PNG donusumu basarisiz: $input" }
   Write-Host "OK $name"
 }
