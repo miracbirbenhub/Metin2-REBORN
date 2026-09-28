@@ -1,6 +1,8 @@
 #if UNITY_EDITOR
 using System;
 using System.IO;
+using System.Text;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -80,7 +82,7 @@ namespace Metin2Reborn.Editor
                 BuildCamera(player);
                 BuildMobileHUD(player);
                 BuildFallbackEnvironment();
-                BuildBlue1EnvironmentObjects(mapRoot.transform, chunkSize);
+                BuildBlue1SourceObjects(mapRoot.transform, chunkSize);
 
                 EditorSceneManager.SaveScene(scene, ScenePath);
                 AssetDatabase.SaveAssets();
@@ -467,93 +469,223 @@ namespace Metin2Reborn.Editor
             terrain.materialTemplate = material;
         }
 
-        private static void BuildBlue1EnvironmentObjects(Transform mapRoot, float chunkSize)
+        private sealed class SourceObjectProperty
         {
-            const string prefabRoot = "Assets/Metin2/Generated/Prefabs/Other";
-            string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { prefabRoot });
-            if (guids.Length == 0)
+            public uint Id;
+            public string ModelName;
+        }
+
+        private sealed class SourceMapObject
+        {
+            public Vector3 Position;
+            public Vector3 Rotation;
+            public float HeightOffset;
+            public uint PropertyId;
+        }
+
+        private static void BuildBlue1SourceObjects(Transform mapRoot, float chunkSize)
+        {
+            string clientRoot = Directory.GetParent(SourceMap).Parent.FullName;
+            Dictionary<uint, SourceObjectProperty> properties = LoadSourceProperties(clientRoot);
+            Dictionary<string, GameObject> prefabs = LoadGeneratedObjectPrefabs();
+            GameObject root = new GameObject("BLUE_1_SOURCE_OBJECTS");
+            root.transform.SetParent(mapRoot, false);
+
+            int placed = 0;
+            int unresolvedProperty = 0;
+            int unresolvedPrefab = 0;
+
+            for (int row = 0; row < ChunkRows; row++)
             {
-                Debug.LogWarning("Blue 1: Other prefab bulunamadı; dekorasyon atlandı.");
-                return;
+                for (int col = 0; col < ChunkColumns; col++)
+                {
+                    string chunkName = row.ToString("D3") + col.ToString("D3");
+                    string chunkPath = Path.Combine(SourceMap, chunkName);
+                    string areaPath = Path.Combine(chunkPath, "areadata.txt");
+                    if (!File.Exists(areaPath))
+                    {
+                        Debug.LogWarning("Blue 1: areadata.txt yok: " + chunkName);
+                        continue;
+                    }
+
+                    List<SourceMapObject> objects = ReadAreaData(areaPath);
+                    foreach (SourceMapObject data in objects)
+                    {
+                        if (!properties.TryGetValue(data.PropertyId, out SourceObjectProperty property))
+                        {
+                            unresolvedProperty++;
+                            continue;
+                        }
+
+                        string key = NormalizeModelKey(property.ModelName);
+                        if (!prefabs.TryGetValue(key, out GameObject prefab))
+                        {
+                            unresolvedPrefab++;
+                            continue;
+                        }
+
+                        GameObject instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+                        if (instance == null) continue;
+
+                        instance.name = "Blue1_Source_" + placed.ToString("D5") + "_" + prefab.name;
+                        instance.transform.SetParent(root.transform, false);
+
+                        // Metin2 AreaData uses centimeters. X is east/west and
+                        // Y is the north/south axis stored as negative values.
+                        // Our Unity map is centered around (0,0), so convert the
+                        // source coordinates into the same meter convention.
+                        float worldX = data.Position.x * WorldScale;
+                        float worldZ = -data.Position.y * WorldScale;
+                        float localX = worldX - (ChunkColumns * chunkSize * 0.5f);
+                        float localZ = worldZ - (ChunkRows * chunkSize * 0.5f);
+
+                        instance.transform.localPosition = new Vector3(localX, 0f, localZ);
+                        instance.transform.localRotation = Quaternion.Euler(
+                            data.Rotation.x,
+                            data.Rotation.y,
+                            data.Rotation.z);
+
+                        Vector3 scale = instance.transform.localScale;
+                        float maxAxis = Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z));
+                        if (maxAxis > 20f) instance.transform.localScale = scale * 0.01f;
+                        else if (maxAxis < 0.01f) instance.transform.localScale = scale * 100f;
+
+                        PlaceObjectOnTerrain(instance, localX, localZ, data.HeightOffset * WorldScale);
+                        placed++;
+                    }
+                }
             }
 
-            // Prefer obvious world-decoration names. If the imported client build
-            // uses different names, fall back to the first available Other prefabs.
-            System.Collections.Generic.List<GameObject> candidates = new System.Collections.Generic.List<GameObject>();
+            Debug.Log("Metin2: Blue 1 gerçek AreaData objeleri: " + placed + " yerleştirildi. " +
+                      "Property çözülemedi: " + unresolvedProperty + ", prefab bulunamadı: " + unresolvedPrefab);
+        }
+
+        private static Dictionary<uint, SourceObjectProperty> LoadSourceProperties(string clientRoot)
+        {
+            Dictionary<uint, SourceObjectProperty> result = new Dictionary<uint, SourceObjectProperty>();
+            string propertyRoot = Path.Combine(clientRoot, "property");
+            if (!Directory.Exists(propertyRoot))
+            {
+                Debug.LogWarning("Metin2: property klasörü bulunamadı: " + propertyRoot);
+                return result;
+            }
+
+            string[] files = Directory.GetFiles(propertyRoot, "*.prb", SearchOption.AllDirectories);
+            foreach (string file in files)
+            {
+                string[] lines = File.ReadAllLines(file, Encoding.UTF8);
+                if (lines.Length < 3) continue;
+
+                if (!uint.TryParse(lines[1].Trim(), out uint id)) continue;
+                string model = ExtractQuotedValue(lines, "buildingfile");
+                if (string.IsNullOrEmpty(model)) continue;
+
+                result[id] = new SourceObjectProperty { Id = id, ModelName = model };
+            }
+
+            Debug.Log("Metin2: Blue 1 building property sayısı: " + result.Count);
+            return result;
+        }
+
+        private static Dictionary<string, GameObject> LoadGeneratedObjectPrefabs()
+        {
+            Dictionary<string, GameObject> result = new Dictionary<string, GameObject>(StringComparer.OrdinalIgnoreCase);
+            string root = "Assets/Metin2/Generated/Prefabs";
+            string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { root });
             foreach (string guid in guids)
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                 if (prefab == null) continue;
 
-                string n = prefab.name.ToLowerInvariant();
-                if (n.Contains("tree") || n.Contains("rock") || n.Contains("stone") ||
-                    n.Contains("bush") || n.Contains("grass") || n.Contains("flower") ||
-                    n.Contains("wood") || n.Contains("fence") || n.Contains("house") ||
-                    n.Contains("building") || n.Contains("object"))
-                {
-                    candidates.Add(prefab);
-                }
+                string key = NormalizeModelKey(prefab.name);
+                if (!result.ContainsKey(key)) result.Add(key, prefab);
             }
+            Debug.Log("Metin2: Source object prefab indexi: " + result.Count);
+            return result;
+        }
 
-            if (candidates.Count == 0)
+        private static List<SourceMapObject> ReadAreaData(string path)
+        {
+            List<SourceMapObject> result = new List<SourceMapObject>();
+            string[] lines = File.ReadAllLines(path, Encoding.UTF8);
+            for (int i = 0; i < lines.Length; i++)
             {
-                foreach (string guid in guids)
+                if (!lines[i].TrimStart().StartsWith("Start Object", StringComparison.OrdinalIgnoreCase)) continue;
+                if (i + 3 >= lines.Length) continue;
+
+                string[] p = lines[i + 1].Trim().Split(new[] { ' ', '\\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (p.Length < 3) continue;
+                if (!float.TryParse(p[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float x)) continue;
+                if (!float.TryParse(p[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float y)) continue;
+                if (!float.TryParse(p[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float z)) continue;
+                if (!uint.TryParse(lines[i + 2].Trim(), out uint propertyId)) continue;
+
+                string[] r = lines[i + 3].Trim().Split('#');
+                Vector3 rotation = Vector3.zero;
+                if (r.Length >= 3)
                 {
-                    GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
-                    if (prefab != null) candidates.Add(prefab);
+                    float.TryParse(r[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out rotation.x);
+                    float.TryParse(r[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out rotation.y);
+                    float.TryParse(r[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out rotation.z);
                 }
+
+                float height = 0f;
+                if (i + 4 < lines.Length)
+                    float.TryParse(lines[i + 4].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out height);
+
+                result.Add(new SourceMapObject
+                {
+                    Position = new Vector3(x, y, z),
+                    Rotation = rotation,
+                    HeightOffset = height,
+                    PropertyId = propertyId
+                });
             }
+            return result;
+        }
 
-            GameObject root = new GameObject("BLUE_1_WORLD_OBJECTS");
-            root.transform.SetParent(mapRoot, false);
-
-            System.Random random = new System.Random(1001);
-            int placed = 0;
-
-            for (int row = 0; row < ChunkRows; row++)
+        private static string ExtractQuotedValue(string[] lines, string key)
+        {
+            foreach (string line in lines)
             {
-                for (int col = 0; col < ChunkColumns; col++)
+                string trimmed = line.Trim();
+                if (!trimmed.StartsWith(key, StringComparison.OrdinalIgnoreCase)) continue;
+                int first = trimmed.IndexOf('"');
+                int last = trimmed.LastIndexOf('"');
+                if (first >= 0 && last > first) return trimmed.Substring(first + 1, last - first - 1);
+            }
+            return string.Empty;
+        }
+
+        private static string NormalizeModelKey(string value)
+        {
+            string name = value.Replace('\\\\', '/');
+            name = Path.GetFileNameWithoutExtension(name);
+            int lod = name.IndexOf("_lod_", StringComparison.OrdinalIgnoreCase);
+            if (lod >= 0) name = name.Substring(0, lod);
+            return name.Replace(" ", "_").Trim().ToLowerInvariant();
+        }
+
+        private static void PlaceObjectOnTerrain(GameObject instance, float localX, float localZ, float heightOffset)
+        {
+            Vector3 world = instance.transform.parent.parent.TransformPoint(new Vector3(localX, 0f, localZ));
+            Terrain best = null;
+            foreach (Terrain terrain in UnityEngine.Object.FindObjectsOfType<Terrain>())
+            {
+                Vector3 p = terrain.GetPosition();
+                Vector3 size = terrain.terrainData.size;
+                if (world.x >= p.x && world.x <= p.x + size.x && world.z >= p.z && world.z <= p.z + size.z)
                 {
-                    int count = 3;
-                    for (int i = 0; i < count; i++)
-                    {
-                        GameObject prefab = candidates[random.Next(candidates.Count)];
-                        float x = col * chunkSize + 12f + (float)random.NextDouble() * (chunkSize - 24f);
-                        float z = row * chunkSize + 12f + (float)random.NextDouble() * (chunkSize - 24f);
-
-                        // Avoid the central player spawn area.
-                        float localX = x - (ChunkColumns * chunkSize * 0.5f);
-                        float localZ = z - (ChunkRows * chunkSize * 0.5f);
-                        if (localX * localX + localZ * localZ < 35f * 35f)
-                            continue;
-
-                        GameObject instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
-                        if (instance == null) continue;
-
-                        instance.name = "Blue1_Object_" + placed.ToString("D3") + "_" + prefab.name;
-                        instance.transform.SetParent(root.transform, false);
-                        instance.transform.localPosition = new Vector3(
-                            x - (ChunkColumns * chunkSize * 0.5f),
-                            0f,
-                            z - (ChunkRows * chunkSize * 0.5f));
-                        instance.transform.localRotation = Quaternion.Euler(0f, (float)random.NextDouble() * 360f, 0f);
-
-                        // Scale imported client props into the same meter convention
-                        // as the map. Keep the source scale when it is already sane.
-                        Vector3 s = instance.transform.localScale;
-                        float maxAxis = Mathf.Max(Mathf.Abs(s.x), Mathf.Abs(s.y), Mathf.Abs(s.z));
-                        if (maxAxis > 20f)
-                            instance.transform.localScale = s * 0.01f;
-                        else if (maxAxis < 0.01f)
-                            instance.transform.localScale = s * 100f;
-
-                        placed++;
-                    }
+                    best = terrain;
+                    break;
                 }
             }
-
-            Debug.Log("Metin2: Blue 1 dekorasyon objeleri yerleştirildi: " + placed);
+            if (best == null) return;
+            float y = best.SampleHeight(world) + best.GetPosition().y + heightOffset;
+            Vector3 local = instance.transform.localPosition;
+            local.y = y - instance.transform.parent.parent.position.y;
+            instance.transform.localPosition = local;
         }
 
         private static GameObject BuildPlayer(Transform mapRoot)
